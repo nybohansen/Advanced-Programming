@@ -81,14 +81,13 @@ interp = run
 
 getInst :: MSM Inst
 getInst = do s <- get
-             inst <- (prog s) !! (pc s)
-             return inst
+             return ((prog s) !! (pc s))
 
 -- | This function interprets the given instruction. It returns True
 -- if the MSM is supposed to continue it's execution after this
 -- instruction.
 interpInst :: Inst -> MSM Bool
-interpInst (PUSH a) = return True
+interpInst (PUSH a) = return False
 --interpInst POP      =
 --interpInst DUP      =
 --interpInst SWAP     =
