@@ -1,6 +1,6 @@
 {-
     Course: Advanced Programming
-    Author: Mads Ohm Larsen
+    Authors: Kasper Nybo Hansen and Mads Ohm Larsen
 -}
 module MSM where
 
@@ -30,12 +30,12 @@ type Prog = [Inst]
 type Stack = [Int]
 
 -- | This data type encapsulates the state of a running MSM.
-data State = State { prog  :: Prog,
-                     pc    :: Int,
-                     stack :: Stack,
-                     regA  :: Int,
-                     regB  :: Int }
-           deriving (Show)
+data State = State { prog  :: Prog
+                   , pc    :: Int
+                   , stack :: Stack
+                   , regA  :: Int
+                   , regB  :: Int 
+                   } deriving (Show)
 
 
 -- This is the monad that is used to implement the MSM. 
@@ -43,10 +43,12 @@ newtype MSM a = MSM (State -> Maybe (a, State))
 
 instance Monad MSM where
     -- (>>=) :: MSM a -> (a -> MSM b) -> MSM b
-    (MSM p) >>= k = k p
+    (MSM p) >>= k = MSM (\s -> let Just (result, newS) = p s
+                                   MSM p' = k result
+                               in p' newS)
 
     -- return :: a -> MSM a
-    return a = 
+    return a = MSM (\s -> Just (a, s))
 
 
 -- The following four functions provide an interface to implement
@@ -58,16 +60,17 @@ get = ...
 
 -- | This function set a new state for the running MSM.
 set :: State -> MSM ()
-set m = ...
+set m = State $ \_ -> ((), m)
 
 -- | This function modifies the state for the running MSM according to
 -- the provided function argument
 modify :: (State -> State) -> MSM ()
-modify f = ...
+modify f = do x <- get
+              set (f x) 
 
 -- | This function halts the execution with an error.
-haltWithError :: MSM a
-haltWithError = ...
+--haltWithError :: MSM a
+--haltWithError = ...
 
 -- | This function runs the MSM.
 interp :: MSM ()
@@ -76,11 +79,16 @@ interp = run
                         cont <- interpInst inst
                         when cont run
 
+getInst :: MSM Inst
+getInst = do s <- get
+             inst <- (prog s) !! (pc s)
+             return inst
+
 -- | This function interprets the given instruction. It returns True
 -- if the MSM is supposed to continue it's execution after this
 -- instruction.
 interpInst :: Inst -> MSM Bool
---interpInst (PUSH a) = 
+interpInst (PUSH a) = return True
 --interpInst POP      =
 --interpInst DUP      =
 --interpInst SWAP     =
@@ -89,16 +97,14 @@ interpInst :: Inst -> MSM Bool
 --interpInst STORE_A  =
 --interpInst STORE_B  =
 --interpInst NEG      =
-interpInst ADD      = do x <- get
-                         y <- get
-                         add 
+--interpInst ADD      = 
 --interpInst JMP      =
 --interpInst (CJMP a) =
 --interpInst HALT     =
 --interpInst _        = 
 
 add :: Int -> Int -> Int
-add (Num x) (Num y) = return $ (x + y)
+add x y = (x + y)
 
 -- | This function constructs the initial state of an MSM running the
 -- given program.
