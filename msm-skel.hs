@@ -65,8 +65,8 @@ set m = MSM (\_ -> Just ((), m))
 -- | This function modifies the state for the running MSM according to
 -- the provided function argument
 modify :: (State -> State) -> MSM ()
-modify f = do x <- get
-              set (f x) 
+modify f = do s <- get
+              set (f s) 
 
 -- | This function halts the execution with an error.
 --haltWithError :: MSM a
@@ -80,30 +80,60 @@ interp = run
                         when cont run
 
 getInst :: MSM Inst
-getInst = do s <- get
+getInst = do s    <- get
+             newS <- modify (\s -> s{pc = pc s + 1})
              return ((prog s) !! (pc s))
 
 -- | This function interprets the given instruction. It returns True
 -- if the MSM is supposed to continue it's execution after this
 -- instruction.
 interpInst :: Inst -> MSM Bool
-interpInst (PUSH a) = return False
---interpInst POP      =
---interpInst DUP      =
---interpInst SWAP     =
---interpInst LOAD_A   =
---interpInst LOAD_B   =
---interpInst STORE_A  =
---interpInst STORE_B  =
---interpInst NEG      =
---interpInst ADD      = 
---interpInst JMP      =
---interpInst (CJMP a) =
---interpInst HALT     =
---interpInst _        = 
+interpInst (PUSH a) = do s <- modify (\s -> s{stack = a : stack s})
+                         return True   
 
-add :: Int -> Int -> Int
-add x y = (x + y)
+interpInst POP      = do s <- modify (\s -> s{stack = tail $ stack s})
+                         return True
+                         
+interpInst DUP      = do s <- modify (\s -> s{stack = (head $ stack s) : stack s})
+                         return True
+
+interpInst SWAP     = do s <- modify (\s -> let (x:y:xs) = stack s
+                                            in s{stack = y : x : xs})
+                         return True
+
+interpInst LOAD_A   = do s <- modify (\s -> s{stack = (regA s) : stack s})
+                         return True
+
+interpInst LOAD_B   = do s <- modify (\s -> s{stack = (regB s) : stack s})
+                         return True
+
+interpInst STORE_A  = do s <- modify (\s -> let (x:xs) = stack s
+                                            in s{stack = xs, regA = x})
+                         return True
+                         
+interpInst STORE_B  = do s <- modify (\s -> let (x:xs) = stack s
+                                            in s{stack = xs, regB = x})
+                         return True
+                         
+interpInst NEG      = do s <- modify (\s -> let (x:xs) = stack s
+                                            in s{stack = -x : xs})
+                         return True
+                         
+interpInst ADD      = do s <- modify (\s -> let (x:y:xs) = stack s
+                                            in s{stack = (x+y) : xs})
+                         return True
+                         
+interpInst JMP      = do s <- modify (\s -> s{stack = tail $ stack s, pc = head $ stack s})
+                         return True
+                         
+interpInst (CJMP a) = do s <- modify (\s -> let (x:xs) = stack s
+                                            in if x > 0
+                                               then s{stack = xs, pc = a}
+                                               else s{stack = xs})
+                         return True
+                                               
+interpInst HALT     = return False
+--interpInst _        = 
 
 -- | This function constructs the initial state of an MSM running the
 -- given program.
