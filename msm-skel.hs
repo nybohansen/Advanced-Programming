@@ -56,11 +56,11 @@ instance Monad MSM where
 
 -- | This function returns the current state of the running MSM.
 get :: MSM State
-get = ...
+get = MSM (\s -> Just (s,s))
 
 -- | This function set a new state for the running MSM.
 set :: State -> MSM ()
-set m = State $ \_ -> ((), m)
+set m = MSM (\_ -> Just ((), m))
 
 -- | This function modifies the state for the running MSM according to
 -- the provided function argument
