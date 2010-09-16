@@ -56,7 +56,7 @@ instance Monad MSM where
 
 -- | This function returns the current state of the running MSM.
 get :: MSM State
-get = MSM (\s -> Just (s,s))
+get = MSM (\s -> Just (s, s))
 
 -- | This function set a new state for the running MSM.
 set :: State -> MSM ()
@@ -69,8 +69,8 @@ modify f = do s <- get
               set (f s) 
 
 -- | This function halts the execution with an error.
---haltWithError :: MSM a
---haltWithError = ...
+haltWithError :: MSM a
+haltWithError = error "Error"
 
 -- | This function runs the MSM.
 interp :: MSM ()
@@ -91,14 +91,17 @@ interpInst :: Inst -> MSM Bool
 interpInst (PUSH a) = do s <- modify (\s -> s{stack = a : stack s})
                          return True   
 
-interpInst POP      = do s <- modify (\s -> s{stack = tail $ stack s})
+interpInst POP      = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = xs}
+                                                            otherwise -> haltWithError `seq` s)
+                                                            
                          return True
                          
-interpInst DUP      = do s <- modify (\s -> s{stack = (head $ stack s) : stack s})
+interpInst DUP      = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = x : x : xs}
+                                                            otherwise -> haltWithError `seq` s)
                          return True
 
-interpInst SWAP     = do s <- modify (\s -> let (x:y:xs) = stack s
-                                            in s{stack = y : x : xs})
+interpInst SWAP     = do s <- modify (\s -> case stack s of (x:y:xs)  -> s{stack = y : x : xs}
+                                                            otherwise -> haltWithError `seq` s)
                          return True
 
 interpInst LOAD_A   = do s <- modify (\s -> s{stack = (regA s) : stack s})
@@ -107,33 +110,33 @@ interpInst LOAD_A   = do s <- modify (\s -> s{stack = (regA s) : stack s})
 interpInst LOAD_B   = do s <- modify (\s -> s{stack = (regB s) : stack s})
                          return True
 
-interpInst STORE_A  = do s <- modify (\s -> let (x:xs) = stack s
-                                            in s{stack = xs, regA = x})
+interpInst STORE_A  = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = xs, regA = x}
+                                                            otherwise -> haltWithError `seq` s)
                          return True
                          
-interpInst STORE_B  = do s <- modify (\s -> let (x:xs) = stack s
-                                            in s{stack = xs, regB = x})
+interpInst STORE_B  = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = xs, regB = x}
+                                                            otherwise -> haltWithError `seq` s)
                          return True
                          
-interpInst NEG      = do s <- modify (\s -> let (x:xs) = stack s
-                                            in s{stack = -x : xs})
+interpInst NEG      = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = -x : xs}
+                                                            otherwise -> haltWithError `seq` s)
                          return True
                          
-interpInst ADD      = do s <- modify (\s -> let (x:y:xs) = stack s
-                                            in s{stack = (x+y) : xs})
+interpInst ADD      = do s <- modify (\s -> case stack s of (x:y:xs)  -> s{stack = (x+y) : xs}
+                                                            otherwise -> haltWithError `seq` s)
                          return True
                          
-interpInst JMP      = do s <- modify (\s -> s{stack = tail $ stack s, pc = head $ stack s})
+interpInst JMP      = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = xs, pc = x}
+                                                            otherwise -> haltWithError `seq` s)
                          return True
                          
-interpInst (CJMP a) = do s <- modify (\s -> let (x:xs) = stack s
-                                            in if x > 0
-                                               then s{stack = xs, pc = a}
-                                               else s{stack = xs})
+interpInst (CJMP a) = do s <- modify (\s -> case stack s of (x:xs)    -> if x > 0
+                                                                         then s{stack = xs, pc = a}
+                                                                         else s{stack = xs}
+                                                            otherwise -> haltWithError `seq` s)
                          return True
                                                
 interpInst HALT     = return False
---interpInst _        = 
 
 -- | This function constructs the initial state of an MSM running the
 -- given program.
