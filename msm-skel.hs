@@ -69,8 +69,8 @@ modify f = do s <- get
               set (f s) 
 
 -- | This function halts the execution with an error.
-haltWithError :: MSM a
-haltWithError = error "Error"
+haltWithError :: String -> MSM a
+haltWithError s = error s
 
 -- | This function runs the MSM.
 interp :: MSM ()
@@ -79,6 +79,7 @@ interp = run
                         cont <- interpInst inst
                         when cont run
 
+-- This function returns the next instruction on the stack
 getInst :: MSM Inst
 getInst = do s    <- get
              newS <- modify (\s -> s{pc = pc s + 1})
@@ -89,19 +90,18 @@ getInst = do s    <- get
 -- instruction.
 interpInst :: Inst -> MSM Bool
 interpInst (PUSH a) = do s <- modify (\s -> s{stack = a : stack s})
-                         return True   
+                         return stackControl
 
 interpInst POP      = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = xs}
-                                                            otherwise -> haltWithError `seq` s)
-                                                            
+                                                            otherwise -> seq (haltWithError "POP error") s)
                          return True
                          
 interpInst DUP      = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = x : x : xs}
-                                                            otherwise -> haltWithError `seq` s)
+                                                            otherwise -> seq (haltWithError "DUP error") s)
                          return True
 
 interpInst SWAP     = do s <- modify (\s -> case stack s of (x:y:xs)  -> s{stack = y : x : xs}
-                                                            otherwise -> haltWithError `seq` s)
+                                                            otherwise -> seq haltWithError "SWAP error" s)
                          return True
 
 interpInst LOAD_A   = do s <- modify (\s -> s{stack = (regA s) : stack s})
@@ -111,33 +111,45 @@ interpInst LOAD_B   = do s <- modify (\s -> s{stack = (regB s) : stack s})
                          return True
 
 interpInst STORE_A  = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = xs, regA = x}
-                                                            otherwise -> haltWithError `seq` s)
+                                                            otherwise -> seq (haltWithError "STORE A error") s)
                          return True
                          
 interpInst STORE_B  = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = xs, regB = x}
-                                                            otherwise -> haltWithError `seq` s)
+                                                            otherwise -> seq (haltWithError "STORE B error") s)
                          return True
                          
 interpInst NEG      = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = -x : xs}
-                                                            otherwise -> haltWithError `seq` s)
+                                                            otherwise -> seq (haltWithError "NEG error") s)
                          return True
                          
 interpInst ADD      = do s <- modify (\s -> case stack s of (x:y:xs)  -> s{stack = (x+y) : xs}
-                                                            otherwise -> haltWithError `seq` s)
+                                                            otherwise -> seq (haltWithError "ADD") s)
                          return True
                          
 interpInst JMP      = do s <- modify (\s -> case stack s of (x:xs)    -> s{stack = xs, pc = x}
-                                                            otherwise -> haltWithError `seq` s)
+                                                            otherwise -> seq (haltWithError "JMP") s)
                          return True
                          
 interpInst (CJMP a) = do s <- modify (\s -> case stack s of (x:xs)    -> if x > 0
                                                                          then s{stack = xs, pc = a}
                                                                          else s{stack = xs}
-                                                            otherwise -> haltWithError `seq` s)
+                                                            otherwise -> seq (haltWithError "CJMP") s)
                          return True
                                                
 interpInst HALT     = return False
 
+
+{-
+
+--Couldn't we get the state by using the get function defined??
+stackControl :: Bool
+stackControl = stackControl2 get 
+
+-- Don't know what i'm doing ;-)                
+stackControl2 :: MSM State -> Bool
+stackControl2 state = True
+-}
+                
 -- | This function constructs the initial state of an MSM running the
 -- given program.
 initial :: Prog -> State
