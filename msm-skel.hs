@@ -50,7 +50,6 @@ instance Monad MSM where
     -- return :: a -> MSM a
     return a = MSM (\s -> Just (a, s))
 
-
 -- The following four functions provide an interface to implement
 -- operations of the MSM.
 
@@ -123,24 +122,26 @@ interpInst ADD      = do s <- modify (\s -> case stack s of (x:y:xs) -> s{stack 
 interpInst JMP      = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = xs, pc = x})
                          return True
                          
-interpInst (CJMP a) = do s <- modify (\s -> case stack s of (x:xs)   -> if x > 0
+interpInst (CJMP a) = do s <- modify (\s -> case stack s of (x:xs)   -> if x < 0
                                                                             then s{stack = xs, pc = a}
-                                                                            else s{stack = xs})
+                                                                            else s{stack = xs, pc = pc s + 1})
                          return True
                                                
 interpInst HALT     = return False
 
+-- | This function is called in each step
+-- It checks that the next instrution will be valid to run
 check :: Inst -> MSM Bool
 check inst = do s <- get
                 if (pc s > (length $ prog s))
                     then haltWithError "Program counter went too far, perhaps you're missing a HALT"
                     else case inst of (PUSH _) -> return True
                                       SWAP     -> case stack s of (_:_:_)   -> return True
-                                                                  otherwise -> haltWithError "SWAP failed"
+                                                                  otherwise -> haltWithError ((show inst) ++ " failed")
                                       LOAD_A   -> return True
                                       LOAD_B   -> return True
                                       ADD      -> case stack s of (_:_:_)   -> return True
-                                                                  otherwise -> haltWithError "ADD failed"   
+                                                                  otherwise -> haltWithError ((show inst) ++ " failed")
                                       HALT     -> return True
                                       _        -> case stack s of (_:_)     -> return True
                                                                   otherwise -> haltWithError ((show inst) ++ " failed")
@@ -154,3 +155,52 @@ initial p = State { prog = p, pc = 0, stack = [], regA = 0, regB = 0 }
 runMSM :: Prog -> Maybe State
 runMSM p = let (MSM f) = interp 
            in fmap snd $ f $ initial p
+           
+-- Will result in a state with one item on the stack, namely 42
+test1 = runMSM [PUSH 12, PUSH 22, ADD, HALT]
+
+-- Will result in an error regarding pop from empty stack
+test2 = runMSM [POP]
+
+-- Will result in an error regarding PC to large
+test3 = runMSM [PUSH 1]
+
+-- Calculates the nth fibonacci number
+fibonacci n = 
+    runMSM [-- Start of fibonacci numbers
+            PUSH 1,
+            PUSH 1,
+            
+            -- Subtract two, as we already have them
+            PUSH n,
+            PUSH 2,
+            NEG,
+            ADD,
+            
+            DUP,
+            STORE_A,
+            
+            -- Continue the algorithm?
+            CJMP 9,
+            
+            -- Stop calculating
+            HALT,
+            
+            -- Start of the algorithm
+            DUP,
+            STORE_B,
+            ADD,
+            LOAD_B,
+            SWAP,
+            
+            -- Subtract one from loop counter
+            LOAD_A,
+            PUSH 1,
+            NEG,
+            ADD,
+            DUP,
+            STORE_A,
+            
+            -- Jump to start of algorithm
+            PUSH 8,
+            JMP]
