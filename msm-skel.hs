@@ -20,6 +20,8 @@ data Inst = PUSH Int
           | ADD 
           | JMP
           | CJMP Int
+          | SUB -- Sugar for NEG, ADD
+          | MULT
           | HALT 
           deriving (Eq, Show)
  
@@ -113,10 +115,10 @@ interpInst STORE_A  = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack 
 interpInst STORE_B  = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = xs, regB = x})
                          return True
                          
-interpInst NEG      = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = -x : xs})
+interpInst NEG      = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = (-x) : xs})
                          return True
                          
-interpInst ADD      = do s <- modify (\s -> case stack s of (x:y:xs) -> s{stack = (x+y) : xs})
+interpInst ADD      = do s <- modify (\s -> case stack s of (x:y:xs) -> s{stack = (y+x) : xs})
                          return True
                          
 interpInst JMP      = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = xs, pc = x})
@@ -124,7 +126,14 @@ interpInst JMP      = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack 
                          
 interpInst (CJMP a) = do s <- modify (\s -> case stack s of (x:xs)   -> if x < 0
                                                                             then s{stack = xs, pc = a}
-                                                                            else s{stack = xs, pc = pc s + 1})
+                                                                            else s{stack = xs})
+                         return True
+                         
+interpInst SUB      = do _ <- interpInst NEG
+                         _ <- interpInst ADD
+                         return True
+
+interpInst MULT     = do s <- modify (\s -> case stack s of (x:y:xs) -> s{stack = (x*y) : xs})
                          return True
                                                
 interpInst HALT     = return False
@@ -136,13 +145,17 @@ check inst = do s <- get
                 if (pc s > (length $ prog s))
                     then haltWithError "Program counter went too far, perhaps you're missing a HALT"
                     else case inst of (PUSH _) -> return True
-                                      SWAP     -> case stack s of (_:_:_)   -> return True
-                                                                  otherwise -> haltWithError ((show inst) ++ " failed")
                                       LOAD_A   -> return True
                                       LOAD_B   -> return True
-                                      ADD      -> case stack s of (_:_:_)   -> return True
-                                                                  otherwise -> haltWithError ((show inst) ++ " failed")
                                       HALT     -> return True
+                                      JMP      -> if head (stack s) < 0
+                                                     then haltWithError ("Trying to JMP to a negativ register")
+                                                     else return True
+                                      x | x == ADD  ||  
+                                          x == SWAP ||
+                                          x == SUB  ||
+                                          x == MULT -> case stack s of (_:_:_)   -> return True
+                                                                       otherwise -> haltWithError ((show inst) ++ " failed")
                                       _        -> case stack s of (_:_)     -> return True
                                                                   otherwise -> haltWithError ((show inst) ++ " failed")
                 
@@ -157,34 +170,34 @@ runMSM p = let (MSM f) = interp
            in fmap snd $ f $ initial p
            
 -- Will result in a state with one item on the stack, namely 42
+test1 :: Maybe State
 test1 = runMSM [PUSH 12, PUSH 22, ADD, HALT]
 
 -- Will result in an error regarding pop from empty stack
+test2 :: Maybe State
 test2 = runMSM [POP]
 
 -- Will result in an error regarding PC to large
+test3 :: Maybe State
 test3 = runMSM [PUSH 1]
 
 -- Calculates the nth fibonacci number
+fibonacci :: Int -> Maybe State
 fibonacci n = 
     runMSM [-- Start of fibonacci numbers
-            PUSH 1,
+            PUSH 0,
             PUSH 1,
             
-            -- Subtract two, as we already have them
+            -- Subtract one, as we already have the first
             PUSH n,
-            PUSH 2,
-            NEG,
-            ADD,
+            PUSH 1,
+            SUB,
             
             DUP,
             STORE_A,
             
             -- Continue the algorithm?
-            CJMP 9,
-            
-            -- Stop calculating
-            HALT,
+            CJMP 20,
             
             -- Start of the algorithm
             DUP,
@@ -196,11 +209,55 @@ fibonacci n =
             -- Subtract one from loop counter
             LOAD_A,
             PUSH 1,
-            NEG,
-            ADD,
+            SUB,
             DUP,
             STORE_A,
             
             -- Jump to start of algorithm
-            PUSH 8,
-            JMP]
+            PUSH 7,
+            JMP,
+
+            -- Stop calculating
+            SWAP, 
+            POP,
+            HALT]
+            
+fibonacciList n = 
+    runMSM [-- Init
+            PUSH 1,
+            PUSH 1,
+            PUSH n,
+            PUSH 3,
+            SUB,
+            
+            -- Continue?
+            DUP,
+            CJMP 25,
+            
+            -- Magic...
+            STORE_B,
+            SWAP,
+            DUP,
+            STORE_A,
+            SWAP,
+            LOAD_B,
+            SWAP,
+            DUP,
+            STORE_B,
+            SWAP,
+            LOAD_A,
+            LOAD_B,
+            ADD,
+            SWAP,
+            
+            -- Loop counter countdown
+            PUSH 1,
+            SUB,
+            
+            -- Jump to start
+            PUSH 5,
+            JMP,
+            
+            -- End
+            POP,
+            HALT]
