@@ -1,0 +1,35 @@
+\documentclass[10pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+
+% Package for including code in the document
+\usepackage{listings}
+
+% Uncomment if you want to use Palatino as font
+\usepackage[sc]{mathpazo}
+\linespread{1.05}         % Palatino needs more leading (space between lines)
+
+
+\title{Advanced Programming \\Assignment 1}
+\author{Kasper Nybo Hansen and Mads Ohm Larsen}
+
+\date{2010-09-24}
+
+\begin{document}
+	
+\maketitle
+\section{Introduction}
+For this weeks assignment we had to create an interpreter for a language, called \texttt{MicroStackMachine}.
+This small langauge consists of a \texttt{PC} (Program Counter), two integer registers and a stack of integers.
+
+\section{Implementation}
+In our implementation we have a function called \texttt{interpInst}, which takes a given instruction and computes the new state, that is, update the stack, update the registers, update the \texttt{PC} or halting the execution.
+We also have a \texttt{check} function, which runs just prior to the \texttt{interpInst} function, checking if the next instruction will result in a violation of the program rules, which are that the \texttt{PC} can't be negative, the \texttt{PC} can't be larger then the length of the program, you can't \texttt{POP}, or do other stuff with the stack, if it's empty or hasn't got enough elements for the instruction to use, e.g. the \texttt{ADD} instruction needs at least two elements on the stack.
+
+To the original instruction list we have added \texttt{SUB}, which is syntactic sugar for \texttt{NEG, ADD} and a multiplication instruction \texttt{MULT}.
+
+To test our implementation we have created a small Fibonacci program, which computes the first $n$ Fibonacci numbers\footnote{This can be run by calling e.g. \texttt{fibonacciList 5}, which will result in a stack with the numbers \texttt{[5,3,2,1,1]}}.
+
+\end{document}

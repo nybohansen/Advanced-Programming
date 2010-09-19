@@ -20,7 +20,7 @@ data Inst = PUSH Int
           | ADD 
           | JMP
           | CJMP Int
-          | SUB -- Sugar for NEG, ADD
+          | SUB -- Syntactic sugar for NEG, ADD
           | MULT
           | HALT 
           deriving (Eq, Show)
@@ -149,7 +149,7 @@ check inst = do s <- get
                                       LOAD_B   -> return True
                                       HALT     -> return True
                                       JMP      -> if head (stack s) < 0
-                                                     then haltWithError ("Trying to JMP to a negativ register")
+                                                     then haltWithError ("Trying to JMP to a negative register")
                                                      else return True
                                       x | x == ADD  ||  
                                           x == SWAP ||
