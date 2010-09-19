@@ -148,16 +148,25 @@ check inst = do s <- get
                                       LOAD_A   -> return True
                                       LOAD_B   -> return True
                                       HALT     -> return True
-                                      JMP      -> if head (stack s) < 0
-                                                     then haltWithError ("Trying to JMP to a negative register")
-                                                     else return True
+                                      JMP      -> if length (stack s) > 0 
+                                                     then if head (stack s) > 0
+                                                          then return True
+                                                          else haltWithError ("Trying to JMP to a negative register")
+                                                     else haltWithError ("Trying to JMP from empty stack")
+                                      (CJMP a) -> if length (stack s) > 0
+                                                     then if a >= 0
+                                                             then return True
+                                                             else haltWithError ("Trying to CJMP to a negative register")
+                                                     else haltWithError ("Trying to CJMP from empty stack") 
                                       x | x == ADD  ||  
                                           x == SWAP ||
                                           x == SUB  ||
-                                          x == MULT -> case stack s of (_:_:_)   -> return True
-                                                                       otherwise -> haltWithError ((show inst) ++ " failed")
-                                      _        -> case stack s of (_:_)     -> return True
-                                                                  otherwise -> haltWithError ((show inst) ++ " failed")
+                                          x == MULT -> if length (stack s) > 1
+                                                          then return True
+                                                          else haltWithError ((show inst) ++ " failed")
+                                      _        -> if length (stack s) > 0
+                                                     then return True
+                                                     else haltWithError ((show inst) ++ " failed")
                 
 -- | This function constructs the initial state of an MSM running the
 -- given program.
@@ -185,79 +194,45 @@ test3 = runMSM [PUSH 1]
 fibonacci :: Int -> Maybe State
 fibonacci n = 
     runMSM [-- Start of fibonacci numbers
-            PUSH 0,
-            PUSH 1,
+            PUSH 0, PUSH 1,
             
             -- Subtract one, as we already have the first
-            PUSH n,
-            PUSH 1,
-            SUB,
-            
-            DUP,
-            STORE_A,
-            
+            PUSH n, PUSH 1, SUB,        
+            DUP, STORE_A,
+                        
             -- Continue the algorithm?
             CJMP 20,
             
             -- Start of the algorithm
-            DUP,
-            STORE_B,
-            ADD,
-            LOAD_B,
-            SWAP,
+            DUP, STORE_B, ADD, LOAD_B, SWAP,
             
             -- Subtract one from loop counter
-            LOAD_A,
-            PUSH 1,
-            SUB,
-            DUP,
-            STORE_A,
+            LOAD_A, PUSH 1, SUB, DUP, STORE_A,
             
             -- Jump to start of algorithm
-            PUSH 7,
-            JMP,
+            PUSH 7, JMP,
 
             -- Stop calculating
-            SWAP, 
-            POP,
-            HALT]
-            
+            SWAP, POP, HALT]
+
+fibonacciList :: Int -> Maybe State
 fibonacciList n = 
     runMSM [-- Init
-            PUSH 1,
-            PUSH 1,
-            PUSH n,
-            PUSH 3,
-            SUB,
+            PUSH 1, PUSH 1, PUSH n, PUSH 3, SUB,
             
             -- Continue?
-            DUP,
-            CJMP 25,
+            DUP, CJMP 25,
             
             -- Magic...
-            STORE_B,
-            SWAP,
-            DUP,
-            STORE_A,
-            SWAP,
-            LOAD_B,
-            SWAP,
-            DUP,
-            STORE_B,
-            SWAP,
-            LOAD_A,
-            LOAD_B,
-            ADD,
-            SWAP,
+            STORE_B, SWAP, DUP, STORE_A, SWAP,
+            LOAD_B, SWAP, DUP, STORE_B, SWAP,
+            LOAD_A, LOAD_B, ADD, SWAP,
             
             -- Loop counter countdown
-            PUSH 1,
-            SUB,
+            PUSH 1, SUB,
             
             -- Jump to start
-            PUSH 5,
-            JMP,
+            PUSH 5, JMP,
             
             -- End
-            POP,
-            HALT]
+            POP, HALT]

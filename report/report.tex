@@ -6,13 +6,35 @@
 
 % Package for including code in the document
 \usepackage{listings}
+\usepackage{color}
+\definecolor{blue}{rgb}{0,0,0.8}
+\definecolor{green}{rgb}{0,0.5,0}
+\definecolor{red}{rgb}{0.5,0,0}
+\definecolor{grey}{rgb}{0.5,0.5,0.5}
+\lstset{language=Haskell, 
+numbers=left,           % where to put the line-numbers
+numberstyle=\tiny,      % size and font of line-numbers
+stepnumber=2,           % step between two line-numbers.
+numbersep=10pt,         % distance between line-numbers and the code
+basicstyle= \ttfamily \footnotesize,  % size and fonts of the code
+breaklines=true,        % wrap lines?
+showstringspaces=false, % underline spaces within strings
+tabsize=2,              % replace tabs with # of spaces
+identifierstyle=\color{black},
+keywordstyle=\color{blue},
+stringstyle=\color{green},
+commentstyle=\color{grey},
+inputencoding=utf8x,    % text encoding
+extendedchars=true,     % exotic characters?
+frame=single,             % [none, single, double]
+}
 
 % Uncomment if you want to use Palatino as font
 \usepackage[sc]{mathpazo}
 \linespread{1.05}         % Palatino needs more leading (space between lines)
 
 
-\title{Advanced Programming \\Assignment 1}
+\title{Advanced Programming \\\small{Assignment 1} - \texttt{MicroStackMachine}}
 \author{Kasper Nybo Hansen and Mads Ohm Larsen}
 
 \date{2010-09-24}
@@ -31,5 +53,48 @@ We also have a \texttt{check} function, which runs just prior to the \texttt{int
 To the original instruction list we have added \texttt{SUB}, which is syntactic sugar for \texttt{NEG, ADD} and a multiplication instruction \texttt{MULT}.
 
 To test our implementation we have created a small Fibonacci program, which computes the first $n$ Fibonacci numbers\footnote{This can be run by calling e.g. \texttt{fibonacciList 5}, which will result in a stack with the numbers \texttt{[5,3,2,1,1]}}.
+
+\section{Discussion}
+One of the advantages with this approach is that, to implement a new instruction in \texttt{MicroStackMachine} you will only need to change the \texttt{interpInst} to accommondate for the new instruction and change \texttt{check}, so it knows when the instruction is valid.
+
+\section{Test programs}
+
+\begin{lstlisting}
+-- Will result in a state with one item on the stack, namely 42
+test1 :: Maybe State
+test1 = runMSM [PUSH 12, PUSH 22, ADD, HALT]
+
+-- Will result in an error regarding pop from empty stack
+test2 :: Maybe State
+test2 = runMSM [POP]
+
+-- Will result in an error regarding PC to large
+test3 :: Maybe State
+test3 = runMSM [PUSH 1]
+\end{lstlisting}
+
+\begin{lstlisting}
+fibonacciList :: Int -> Maybe State
+fibonacciList n = 
+    runMSM [-- Init
+            PUSH 1, PUSH 1, PUSH n, PUSH 3, SUB,
+            
+            -- Continue?
+            DUP, CJMP 25,
+            
+            -- Magic...
+            STORE_B, SWAP, DUP, STORE_A, SWAP,
+            LOAD_B, SWAP, DUP, STORE_B, SWAP,
+            LOAD_A, LOAD_B, ADD, SWAP,
+            
+            -- Loop counter countdown
+            PUSH 1, SUB,
+            
+            -- Jump to start
+            PUSH 5, JMP,
+            
+            -- End
+            POP, HALT]
+\end{lstlisting}
 
 \end{document}
