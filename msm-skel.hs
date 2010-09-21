@@ -6,6 +6,8 @@ module MSM where
 
 -- we want to use monads here
 import Control.Monad
+import Control.Monad.Reader
+import Control.Monad.Writer
 
 -- | This data type represents instructions for the MSM.
 data Inst = PUSH Int
@@ -22,6 +24,7 @@ data Inst = PUSH Int
           | CJMP Int
           | SUB -- Syntactic sugar for NEG, ADD
           | MULT
+          | FORK
           | HALT 
           deriving (Eq, Show)
  
@@ -41,27 +44,27 @@ data State = State { prog  :: Prog
 
 
 -- This is the monad that is used to implement the MSM. 
-newtype MSM a = MSM (State -> Maybe (a, State))
+newtype MSM a = MSM (State -> [(a, State)])
 
 instance Monad MSM where
     -- (>>=) :: MSM a -> (a -> MSM b) -> MSM b
-    (MSM p) >>= k = MSM (\s -> let Just (result, newS) = p s
-                                   MSM p' = k result
-                               in p' newS)
+    (MSM p) >>= k = MSM (\s -> do (result, newS) <- p s
+                                  let MSM p' = k result
+                                  (p' newS))
 
     -- return :: a -> MSM a
-    return a = MSM (\s -> Just (a, s))
+    return a = MSM (\s -> [(a, s)])
 
 -- The following four functions provide an interface to implement
 -- operations of the MSM.
 
 -- | This function returns the current state of the running MSM.
 get :: MSM State
-get = MSM (\s -> Just (s, s))
+get = MSM (\s -> [(s, s)])
 
 -- | This function set a new state for the running MSM.
 set :: State -> MSM ()
-set m = MSM (\_ -> Just ((), m))
+set m = MSM (\_ -> [((), m)])
 
 -- | This function modifies the state for the running MSM according to
 -- the provided function argument
@@ -83,59 +86,62 @@ interp = do inst <- getInst
 
 -- This function returns the next instruction on the stack
 getInst :: MSM Inst
-getInst = do s    <- get
-             newS <- modify (\s -> s{pc = pc s + 1})
+getInst = do s <- get
+             modify (\s -> s{pc = pc s + 1})
              return ((prog s) !! (pc s))
 
 -- | This function interprets the given instruction. It returns True
 -- if the MSM is supposed to continue it's execution after this
 -- instruction.
 interpInst :: Inst -> MSM Bool
-interpInst (PUSH a) = do s <- modify (\s -> s{stack = a : stack s})
+interpInst (PUSH a) = do modify (\s -> s{stack = a : stack s})
                          return True
 
-interpInst POP      = do s <- modify (\s -> s{stack = tail $ stack s})
+interpInst POP      = do modify (\s -> s{stack = tail $ stack s})
                          return True
                          
-interpInst DUP      = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = x : x : xs})
+interpInst DUP      = do modify (\s -> case stack s of (x:xs)   -> s{stack = x : x : xs})
                          return True
 
-interpInst SWAP     = do s <- modify (\s -> case stack s of (x:y:xs) -> s{stack = y : x : xs})
+interpInst SWAP     = do modify (\s -> case stack s of (x:y:xs) -> s{stack = y : x : xs})
                          return True
 
-interpInst LOAD_A   = do s <- modify (\s -> s{stack = (regA s) : stack s})
+interpInst LOAD_A   = do modify (\s -> s{stack = (regA s) : stack s})
                          return True
 
-interpInst LOAD_B   = do s <- modify (\s -> s{stack = (regB s) : stack s})
+interpInst LOAD_B   = do modify (\s -> s{stack = (regB s) : stack s})
                          return True
 
-interpInst STORE_A  = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = xs, regA = x})
+interpInst STORE_A  = do modify (\s -> case stack s of (x:xs)   -> s{stack = xs, regA = x})
                          return True
                          
-interpInst STORE_B  = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = xs, regB = x})
+interpInst STORE_B  = do modify (\s -> case stack s of (x:xs)   -> s{stack = xs, regB = x})
+                         return True
+                        
+interpInst NEG      = do modify (\s -> case stack s of (x:xs)   -> s{stack = (-x) : xs})
                          return True
                          
-interpInst NEG      = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = (-x) : xs})
+interpInst ADD      = do modify (\s -> case stack s of (x:y:xs) -> s{stack = (y+x) : xs})
                          return True
                          
-interpInst ADD      = do s <- modify (\s -> case stack s of (x:y:xs) -> s{stack = (y+x) : xs})
+interpInst JMP      = do modify (\s -> case stack s of (x:xs)   -> s{stack = xs, pc = x})
                          return True
                          
-interpInst JMP      = do s <- modify (\s -> case stack s of (x:xs)   -> s{stack = xs, pc = x})
+interpInst (CJMP a) = do modify (\s -> case stack s of (x:xs)   -> if x < 0
+                                                                   then s{stack = xs, pc = a}
+                                                                   else s{stack = xs})
                          return True
                          
-interpInst (CJMP a) = do s <- modify (\s -> case stack s of (x:xs)   -> if x < 0
-                                                                            then s{stack = xs, pc = a}
-                                                                            else s{stack = xs})
-                         return True
-                         
-interpInst SUB      = do _ <- interpInst NEG
-                         _ <- interpInst ADD
+interpInst SUB      = do interpInst NEG
+                         interpInst ADD
                          return True
 
-interpInst MULT     = do s <- modify (\s -> case stack s of (x:y:xs) -> s{stack = (x*y) : xs})
+interpInst MULT     = do modify (\s -> case stack s of (x:y:xs) -> s{stack = (x*y) : xs})
                          return True
-                                               
+                         
+interpInst FORK     = do MSM (\s -> [(s, s{stack = 1 : stack s}), (s, s{stack = 0 : stack s})])
+                         return True
+                      
 interpInst HALT     = return False
 
 -- | This function is called in each step
@@ -148,6 +154,7 @@ check inst = do s <- get
                                       LOAD_A   -> return True
                                       LOAD_B   -> return True
                                       HALT     -> return True
+                                      FORK     -> return True
                                       JMP      -> if length (stack s) > 0 
                                                      then if head (stack s) > 0
                                                           then return True
@@ -155,8 +162,8 @@ check inst = do s <- get
                                                      else haltWithError ("Trying to JMP from empty stack")
                                       (CJMP a) -> if length (stack s) > 0
                                                      then if a >= 0
-                                                             then return True
-                                                             else haltWithError ("Trying to CJMP to a negative register")
+                                                          then return True
+                                                          else haltWithError ("Trying to CJMP to a negative register")
                                                      else haltWithError ("Trying to CJMP from empty stack") 
                                       x | x == ADD  ||  
                                           x == SWAP ||
@@ -174,24 +181,24 @@ initial :: Prog -> State
 initial p = State { prog = p, pc = 0, stack = [], regA = 0, regB = 0 }
 
 -- | This function runs the given program on the MSM
-runMSM :: Prog -> Maybe State
+runMSM :: Prog -> [State]
 runMSM p = let (MSM f) = interp 
            in fmap snd $ f $ initial p
-           
+
 -- Will result in a state with one item on the stack, namely 42
-test1 :: Maybe State
+test1 :: [State]
 test1 = runMSM [PUSH 12, PUSH 22, ADD, HALT]
 
 -- Will result in an error regarding pop from empty stack
-test2 :: Maybe State
+test2 :: [State]
 test2 = runMSM [POP]
 
 -- Will result in an error regarding PC to large
-test3 :: Maybe State
+test3 :: [State]
 test3 = runMSM [PUSH 1]
 
 -- Calculates the nth fibonacci number
-fibonacci :: Int -> Maybe State
+fibonacci :: Int -> [State]
 fibonacci n = 
     runMSM [-- Start of fibonacci numbers
             PUSH 0, PUSH 1,
@@ -215,7 +222,7 @@ fibonacci n =
             -- Stop calculating
             SWAP, POP, HALT]
 
-fibonacciList :: Int -> Maybe State
+fibonacciList :: Int -> [State]
 fibonacciList n = 
     runMSM [-- Init
             PUSH 1, PUSH 1, PUSH n, PUSH 3, SUB,
@@ -236,3 +243,7 @@ fibonacciList n =
             
             -- End
             POP, HALT]
+
+forkFib :: [State]
+forkFib = take 5 $ runMSM [PUSH 1, PUSH 1, FORK, NEG, CJMP 12, DUP, STORE_A, SWAP, LOAD_A, ADD, PUSH 2, JMP, HALT]
+           
