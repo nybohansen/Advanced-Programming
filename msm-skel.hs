@@ -6,8 +6,6 @@ module MSM where
 
 -- we want to use monads here
 import Control.Monad
-import Control.Monad.Reader
-import Control.Monad.Writer
 
 -- | This data type represents instructions for the MSM.
 data Inst = PUSH Int
@@ -139,7 +137,7 @@ interpInst SUB      = do interpInst NEG
 interpInst MULT     = do modify (\s -> case stack s of (x:y:xs) -> s{stack = (x*y) : xs})
                          return True
                          
-interpInst FORK     = do MSM (\s -> [(s, s{stack = 1 : stack s}), (s, s{stack = 0 : stack s})])
+interpInst FORK     = do MSM (\s -> [((), s{stack = 1 : stack s}), ((), s{stack = 0 : stack s})])
                          return True
                       
 interpInst HALT     = return False
@@ -149,14 +147,14 @@ interpInst HALT     = return False
 check :: Inst -> MSM Bool
 check inst = do s <- get
                 if (pc s > (length $ prog s))
-                    then haltWithError "Program counter went too far, perhaps you're missing a HALT"
+                    then haltWithError "Program counter went too far. Perhaps you're missing a HALT"
                     else case inst of (PUSH _) -> return True
                                       LOAD_A   -> return True
                                       LOAD_B   -> return True
                                       HALT     -> return True
                                       FORK     -> return True
                                       JMP      -> if length (stack s) > 0 
-                                                     then if head (stack s) > 0
+                                                     then if head (stack s) >= 0
                                                           then return True
                                                           else haltWithError ("Trying to JMP to a negative register")
                                                      else haltWithError ("Trying to JMP from empty stack")
@@ -178,7 +176,7 @@ check inst = do s <- get
 -- | This function constructs the initial state of an MSM running the
 -- given program.
 initial :: Prog -> State
-initial p = State { prog = p, pc = 0, stack = [], regA = 0, regB = 0 }
+initial p = State{ prog = p, pc = 0, stack = [], regA = 0, regB = 0 }
 
 -- | This function runs the given program on the MSM
 runMSM :: Prog -> [State]
@@ -244,6 +242,6 @@ fibonacciList n =
             -- End
             POP, HALT]
 
-forkFib :: [State]
-forkFib = take 5 $ runMSM [PUSH 1, PUSH 1, FORK, NEG, CJMP 12, DUP, STORE_A, SWAP, LOAD_A, ADD, PUSH 2, JMP, HALT]
+forkFib :: Int -> [State]
+forkFib n = take n $ runMSM [PUSH 1, PUSH 1, FORK, NEG, CJMP 12, DUP, STORE_A, SWAP, LOAD_A, ADD, PUSH 2, JMP, HALT]
            
