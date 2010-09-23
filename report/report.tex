@@ -44,27 +44,30 @@ frame=single,             % [none, single, double]
 \maketitle
 \section{Introduction}
 For this weeks assignment we had to create an interpreter for a language, called \texttt{MicroStackMachine}.
-This small langauge consists of a \texttt{PC} (Program Counter), two integer registers and a stack of integers.
+This small language consists of a \texttt{PC} (Program Counter), two integer registers and a stack of integers.
 
 \section{Implementation}
 In our implementation we have a function called \texttt{interpInst}, which takes a given instruction and computes the new state, that is, update the stack, update the registers, update the \texttt{PC} or halting the execution.
 We also have a \texttt{check} function, which runs just prior to the \texttt{interpInst} function, checking if the next instruction will result in a violation of the program rules, which are that the \texttt{PC} can't be negative, the \texttt{PC} can't be larger then the length of the program, you can't \texttt{POP}, or do other stuff with the stack, if it's empty or hasn't got enough elements for the instruction to use, e.g. the \texttt{ADD} instruction needs at least two elements on the stack.
+
+When an violation occurs, the program stops and displays an error message to the consol. The contents of the error message depends on the the violation occurred.
 
 To the original instruction list we have added \texttt{SUB}, which is syntactic sugar for \texttt{NEG, ADD} and a multiplication instruction \texttt{MULT}.
 We also implemented the \texttt{FORK} instruction, which copies the stack, pushes \texttt{0} on the parent stack and \texttt{1} on the child, and then continues working on both programs. 
 While making room for the \texttt{FORK} instruction, we changed the output type and changed the monad itself, to work with \texttt{[(a, State)]} instead of \texttt{Maybe (a, State)}. 
 This way, instead of only having the option to work with one or zero solutions, we can work with any number, and therefore can do concurrent things.
 
-To test our implementation we have created a small Fibonacci program, which computes the first $n$ Fibonacci numbers\footnote{This can be run by calling e.g. \texttt{fibonacciList 5}, which will result in a stack with the numbers \texttt{[5,3,2,1,1]}}.
+
 
 \section{Discussion}
-One of the advantages with this approach is that, to implement a new instruction in \texttt{MicroStackMachine} you will only need to change the \texttt{interpInst} to accommondate for the new instruction and change \texttt{check}, so it knows when the instruction is valid.
+One of the advantages with our approach is that, to implement a new instruction in \texttt{MicroStackMachine} you will only need to change the \texttt{interpInst} to accommodate for the new instruction and change \texttt{check}, so it knows when the instruction is valid.
 
 If one would like to add something special, like \texttt{IO}, you could change the monad with monad transformers, or you could write it into the monad yourself.
 It wouldn't require more work, than fixing the monad definition.
 
 \section{Test programs}
 
+The following are small simple tests, implemented to test the native functions e.g. \texttt{PUSH}, \texttt{ADD}, \texttt{HALT} and \texttt{POP}. The comment above each test, describes the expected output.
 \begin{lstlisting}
 -- Will result in a state with one item on the stack, namely 42
 test1 :: [State]
@@ -78,6 +81,8 @@ test2 = runMSM [POP]
 test3 :: [State]
 test3 = runMSM [PUSH 1]
 \end{lstlisting}
+
+To further test our implementation, we have created a small Fibonacci program, which computes the first $n$ Fibonacci numbers. The program can be run by calling \texttt{fibonacciList 5}, which will result in a stack with the numbers \texttt{[5,3,2,1,1]}.
 
 \begin{lstlisting}
 fibonacciList :: Int -> [State]
