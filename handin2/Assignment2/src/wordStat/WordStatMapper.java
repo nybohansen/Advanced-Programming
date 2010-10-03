@@ -32,7 +32,7 @@ public class WordStatMapper extends MapReduceBase
       Reporter reporter) throws IOException {
 	 
 	  //Split string into word array
-	  String wordArray[] = value.toString().split(" ");
+	  String wordArray[] = value.toString().split("\\s+");
 	  
 	  //number of words
 	  int numberOfWords = wordArray.length;
@@ -40,12 +40,16 @@ public class WordStatMapper extends MapReduceBase
 	  //Pick one random word from the word array. This works because the word array
 	  //contains all the words incl. dublicates. Eg. "one on one" becomes ["one", "on", "one"]
 	  //when selecting a random word in this array, the probability to hit one is still 2/3.
-	  Random rndGenerator = new Random( key.get() + java.util.Calendar.getInstance().getTimeInMillis());
-	  String pickedWord = wordArray[rndGenerator.nextInt(numberOfWords)];
-	  
+	  String pickedWord;
+	  if(numberOfWords>0){
+		  Random rndGenerator = new Random( key.get() + java.util.Calendar.getInstance().getTimeInMillis());
+		  pickedWord = wordArray[rndGenerator.nextInt(numberOfWords)];
+	  }else{
+		  pickedWord = "";
+	  }
 	  //Send it to the reducer
 	  output.collect( new Text("key"), new Text(pickedWord +" " + Integer.toString(numberOfWords)));
-	  
-	  }
+	 
+  }
 }
 
