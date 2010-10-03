@@ -1,5 +1,8 @@
 
-Place files in workspace/Assignment2/
+Place files in somedir
+
+Make symlink from somedir to workspace dir eg.
+ln -s ~/somedir ~/workspace/Assignment2
 
 -- Compile program
 cd workspace/Assignment2
