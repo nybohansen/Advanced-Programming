@@ -123,58 +123,32 @@ Furthermore we have tested this program with the provided shakespeare file as we
 \label{sec:appendix_1}
 Output of character count program when run on shakespeare
 \begin{verbatim}
-  A	46788
-  B	13255
-  C	19907
-  D	13702
-  E	37283
-  F	11369
-  G	10771
-  H	16725
-  I	55619
-  J	1992
-  K	6033
-  L	23140
-  M	14739
-  N	26993
-  O	29425
-  P	10043
-  Q	1097
-  R	25730
-  S	31069
-  T	37620
-  U	15219
-  V	4418
-  W	15103
-  X	695
-  Y	8195
-  Z	440
-  a	260522
-  b	50132
-  c	72390
-  d	144600
-  e	440013
-  f	73847
-  g	61937
-  h	234267
-  i	214236
-  j	2955
-  k	32024
-  l	156344
-  m	101485
-  n	231604
-  o	299672
-  p	50622
-  q	2998
-  r	224942
-  s	232274
-  t	311874
-  u	121613
-  v	36688
-  w	78923
-  x	4866
-  y	90146
-  z	1418  
+  a	307310
+  b	63387
+  c	92297
+  d	158302
+  e	477296
+  f	85216
+  g	72708
+  h	250992
+  i	269855
+  j	4947
+  k	38057
+  l	179484
+  m	116224
+  n	258597
+  o	329097
+  p	60665
+  q	4095
+  r	250672
+  s	263343
+  t	349494
+  u	136832
+  v	41106
+  w	94026
+  x	5561
+  y	98341
+  z	1858
 \end{verbatim}
 
 % section appendix_1 (end)
@@ -185,36 +159,36 @@ Output of character count program when run on shakespeare
 \subsection{LetterCountMapper} % (fold)
 \label{sub:lettercountmapper}
 \begin{lstlisting}
-package letter;
+  package letter;
 
-import java.io.IOException;
-import java.util.StringTokenizer;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.FileSplit;
-import org.apache.hadoop.mapred.MapReduceBase;
-import org.apache.hadoop.mapred.Mapper;
-import org.apache.hadoop.mapred.OutputCollector;
-import org.apache.hadoop.mapred.Reporter;
-import org.apache.hadoop.mapred.JobConf;
+  import java.io.IOException;
+  import java.util.StringTokenizer;
+  import org.apache.hadoop.io.LongWritable;
+  import org.apache.hadoop.io.Text;
+  import org.apache.hadoop.mapred.FileSplit;
+  import org.apache.hadoop.mapred.MapReduceBase;
+  import org.apache.hadoop.mapred.Mapper;
+  import org.apache.hadoop.mapred.OutputCollector;
+  import org.apache.hadoop.mapred.Reporter;
+  import org.apache.hadoop.mapred.JobConf;
 
-public class LetterCountMapper extends MapReduceBase
-    implements Mapper<LongWritable, Text, Text, Text> {
+  public class LetterCountMapper extends MapReduceBase
+      implements Mapper<LongWritable, Text, Text, Text> {
 
-  public LetterCountMapper() { }
+    public LetterCountMapper() { }
 
-  public void map(LongWritable key, Text value, OutputCollector<Text, Text> output,
-      Reporter reporter) throws IOException {
-	    
-	    //Split string into array of chars. Remove all characters that are not in [a-z^A-Z]  
-	    char[] letterArray = value.toString().replaceAll("[^a-z^A-Z]","").toCharArray();
-	   
-	    //For each letter send it to the reducer
-	    for(int i=0; i<letterArray.length; i++){
-	    	output.collect( new Text(String.valueOf(letterArray[i])), new Text("1"));
-	    }
-	  }
-}  
+    public void map(LongWritable key, Text value, OutputCollector<Text, Text> output,
+        Reporter reporter) throws IOException {
+
+  	    //Split string into array of chars. Remove all characters that are not in [a-z]  
+  	    char[] letterArray = value.toString().toLowerCase().replaceAll("[^a-z]","").toCharArray();
+
+  	    //For each letter send it to the reducer
+  	    for(int i=0; i<letterArray.length; i++){
+  	    	output.collect( new Text(String.valueOf(letterArray[i])), new Text("1"));
+  	    }
+  	  }
+  }
 \end{lstlisting}
 
 % subsection lettercountmapper (end)
