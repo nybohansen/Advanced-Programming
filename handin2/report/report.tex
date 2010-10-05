@@ -11,7 +11,7 @@
 \definecolor{green}{rgb}{0,0.5,0}
 \definecolor{red}{rgb}{0.5,0,0}
 \definecolor{grey}{rgb}{0.5,0.5,0.5}
-\lstset{language=Haskell, 
+\lstset{language=Java, 
 numbers=left,           % where to put the line-numbers
 numberstyle=\tiny,      % size and font of line-numbers
 stepnumber=2,           % step between two line-numbers.
@@ -29,6 +29,9 @@ extendedchars=true,     % exotic characters?
 frame=single,             % [none, single, double]
 }
 
+% Verbatim envivorment
+\usepackage{verbatim} 
+
 % Uncomment if you want to use Palatino as font
 \usepackage[sc]{mathpazo}
 \linespread{1.05}         % Palatino needs more leading (space between lines)
@@ -42,14 +45,346 @@ frame=single,             % [none, single, double]
 \begin{document}
 	
 \maketitle
-\section{Introduction}
-For this weeks assignment we had to create two small programs in java, utilizing the Hadoop framework..
-The two small programs where:
 
-\section{Implementation}
+\section{Introduction} % (fold)
+\label{sec:introduction}
+For this weeks assignment we had to create two small programs in java, utilizing the Hadoop framework. 
 
-\section{Discussion}
+The first program should count the letters in a string, and output each letter and the number of occurrences. We have called this program \texttt{letterCount}.
+
+
+The second program should output a number $N$ and a word. The word should be chosen with probability $\frac{1}{N}$ where $N$ is the total number of words in the input text. We have called this program \texttt{wordStat}.
+
+Both programs should also be implemented in the Sawzall programming language.
+% section introduction (end)
+
+\section{Uniform probability} % (fold)
+\label{sec:uniform_probability}
+Uniform probability means that all elements have equal probability $1/n$ where $n$ is the number of elements.
+
+We can explain the way our implementation works, by looking at it backwards. 
+
+In the reducer a random integer, \texttt{rndNumber}, in the interval $[0,N]$ is generated. \texttt{rndNumber} and can be thought of as choosing a word by uniform probability since $N$ is the total number of words. \texttt{rndNumber} refers to a section of the total text. In this section, we have already chosen a word with uniform probability, namely $w_i$. This is why the output word is chosen by uniform probability.
+
+% section uniform_probability (end)
+
+
+\section{Sawzall implementation} % (fold)
+\label{sec:sawzall_implementation}
+The program letterCount ca be implemented in Sawzall as
+
+
+% section sawzall_implementation (end)
+
 
 \section{Test programs}
+We have tested both programs on a simple example, consisting of a file containing the string "one on one", and a more advanced example consisting of the provided Shakespeare file.
+
+\subsection{Test of assignment 1} % (fold)
+\label{sub:assignment_1}
+The first test run on the letterCount program is the simple one consisting of the string "one on one". The output of the program is
+\begin{verbatim}
+  e	2
+  n	3
+  o	3
+\end{verbatim}
+which is the same as if we did a manuel count.
+
+The second test of the letterCount program, the program is run with the provided Shakespeare file as input. The output of the program can bee seen in appendix 1.
+% subsection assignment_1 (end)
+
+\subsection{Test of assignment 2} % (fold)
+\label{sub:assignment_2}
+
+To test the wordStat program, the program is run with the input $one on one$ three times. The output of the program is
+
+\begin{verbatim}  
+  3 on
+  3 one
+  3 one
+  3 one    
+  3 on  
+\end{verbatim}
+
+Furthermore we have tested this program with the provided shakespeare file as well. The output of the wordStat program when tested with the shakespeare file is
+
+\begin{verbatim}
+  1082023 Porter
+  1082023 weak
+  1082023 is
+  1082023 PAGE
+  1082023 him
+\end{verbatim}
+
+% subsection assignment_2 (end)
+
+\newpage
+\section*{Appendix 1} % (fold)
+\label{sec:appendix_1}
+Output of character count program when run on shakespeare
+\begin{verbatim}
+  A	46788
+  B	13255
+  C	19907
+  D	13702
+  E	37283
+  F	11369
+  G	10771
+  H	16725
+  I	55619
+  J	1992
+  K	6033
+  L	23140
+  M	14739
+  N	26993
+  O	29425
+  P	10043
+  Q	1097
+  R	25730
+  S	31069
+  T	37620
+  U	15219
+  V	4418
+  W	15103
+  X	695
+  Y	8195
+  Z	440
+  a	260522
+  b	50132
+  c	72390
+  d	144600
+  e	440013
+  f	73847
+  g	61937
+  h	234267
+  i	214236
+  j	2955
+  k	32024
+  l	156344
+  m	101485
+  n	231604
+  o	299672
+  p	50622
+  q	2998
+  r	224942
+  s	232274
+  t	311874
+  u	121613
+  v	36688
+  w	78923
+  x	4866
+  y	90146
+  z	1418  
+\end{verbatim}
+
+% section appendix_1 (end)
+
+\newpage
+\section{Source code} % (fold)
+
+\subsection{LetterCountMapper} % (fold)
+\label{sub:lettercountmapper}
+\begin{lstlisting}
+package letter;
+
+import java.io.IOException;
+import java.util.StringTokenizer;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.FileSplit;
+import org.apache.hadoop.mapred.MapReduceBase;
+import org.apache.hadoop.mapred.Mapper;
+import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.JobConf;
+
+public class LetterCountMapper extends MapReduceBase
+    implements Mapper<LongWritable, Text, Text, Text> {
+
+  public LetterCountMapper() { }
+
+  public void map(LongWritable key, Text value, OutputCollector<Text, Text> output,
+      Reporter reporter) throws IOException {
+	    
+	    //Split string into array of chars. Remove all characters that are not in [a-z^A-Z]  
+	    char[] letterArray = value.toString().replaceAll("[^a-z^A-Z]","").toCharArray();
+	   
+	    //For each letter send it to the reducer
+	    for(int i=0; i<letterArray.length; i++){
+	    	output.collect( new Text(String.valueOf(letterArray[i])), new Text("1"));
+	    }
+	  }
+}  
+\end{lstlisting}
+
+% subsection lettercountmapper (end)
+
+\newpage
+\subsection{LetterCountReducer} % (fold)
+\label{sub:lettercountreducer}
+
+\begin{lstlisting}
+package letter;
+
+import java.io.IOException;
+import java.util.Iterator;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.MapReduceBase;
+import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Reducer;
+import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.JobConf;
+
+
+public class LetterCountReducer extends MapReduceBase
+    implements Reducer<Text, Text, Text, Text> {
+
+  public LetterCountReducer() { }
+
+  public void reduce(Text key, Iterator<Text> values,
+      OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
+	  	int sum = 0;
+	    while (values.hasNext()) {
+	    	//Sum is total number of occurrences of the letter in key
+	    	sum += Integer.parseInt(values.next().toString());
+	    }
+	    //Output the result
+	    output.collect(key, new Text(Integer.toString(sum)));
+	  }
+}
+\end{lstlisting}
+
+% subsection lettercountreducer (end)
+
+
+\subsection{WordStatMapper} % (fold)
+\label{sub:wordstatmapper}
+\begin{lstlisting}
+package wordStat;
+
+import java.io.IOException;
+import java.util.StringTokenizer;
+
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.FileSplit;
+import org.apache.hadoop.mapred.MapReduceBase;
+import org.apache.hadoop.mapred.Mapper;
+import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.JobConf;
+
+import java.util.Random;
+
+public class WordStatMapper extends MapReduceBase
+    implements Mapper<LongWritable, Text, Text, Text> {
+
+  public WordStatMapper() { }
+
+  public void map(LongWritable key, Text value, OutputCollector<Text, Text> output,
+      Reporter reporter) throws IOException {
+	 
+	  //Split string into word array
+	  String wordArray[] = value.toString().split("\\s+");
+	  
+	  //number of words
+	  int numberOfWords = wordArray.length;
+	  
+	  //Pick one random word from the word array. This works because the word array
+	  //contains all the words including any duplicates. E.x. "one on one" becomes ["one", "on", "one"]
+	  //when selecting a random word in this array, the probability to hit "one" is still 2/3.
+	  String pickedWord = "";
+	  
+	  if(numberOfWords>0){
+		  //If we are not operating on a blank line, i.e. a line which only contains blank chars.
+		  Random rndGenerator = new Random( key.get() + java.util.Calendar.getInstance().getTimeInMillis());
+		  pickedWord = wordArray[rndGenerator.nextInt(numberOfWords)];
+	  }
+	 
+	  //Send it to the reducer
+	  output.collect( new Text("key"), new Text(pickedWord +" " + Integer.toString(numberOfWords)));
+	 
+  }
+}  
+\end{lstlisting}
+% subsection wordstatmapper (end)
+
+
+\subsection{WordStatReducer} % (fold)
+\label{sub:wordstatreducer}
+
+\begin{lstlisting}
+package wordStat;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
+
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.MapReduceBase;
+import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Reducer;
+import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.JobConf;
+
+import java.util.Random;
+
+public class WordStatReducer extends MapReduceBase
+    implements Reducer<Text, Text, Text, Text> {
+
+  public WordStatReducer() { }
+
+  public void reduce(Text key, Iterator<Text> values,
+      OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
+	  
+	  int N = 0;
+	  int n_i = 0;
+	  String w_i;
+	  //Array of all the words
+	  List<String> wordList = new ArrayList<String>();
+	  //Array of the sum 
+	  List<Integer> sumList = new ArrayList<Integer>(); 
+	  
+	  while (values.hasNext()) {
+		  //Create the array Payload containin the word and the number of words
+		  String payload[] = values.next().toString().split(" ");
+		  //Extract the pair from the string
+		  w_i = payload[0];
+		  n_i = Integer.parseInt(payload[1]);  
+		  //If the mapper processed a string containing no chars, we want
+		  //n_i is 0. 
+		  if(n_i>0){
+			  N += n_i;
+			  wordList.add(w_i);
+			  //Add the accumulated sum
+			  sumList.add(N);
+		  }
+	  }
+
+	  //Seed random generator as explained in the assignment
+	  Random rndGenerator = new Random(java.util.Calendar.getInstance().getTimeInMillis()); 
+	  //Select random number in the interval [0,N] 
+	  int rndNumber = rndGenerator.nextInt(N);
+	  
+	  //Find the place in the word array where the picked word is
+	  int i = 0;
+	  while(sumList.get(i)<rndNumber){
+		i++;    
+	  }
+	  
+	  //Store the picked word
+	  String pickedWord = wordList.get(i);
+	  //Send it to the output
+	  output.collect(key, new Text(Integer.toString(N) + " " + pickedWord));  
+  }
+}  
+\end{lstlisting}
+% subsection wordstatreducer (end)
+
+% section source_code (end)
+
+
 
 \end{document}
