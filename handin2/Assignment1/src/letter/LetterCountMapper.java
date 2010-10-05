@@ -1,10 +1,7 @@
-// (c) Copyright 2009 Cloudera, Inc.
-
 package letter;
 
 import java.io.IOException;
 import java.util.StringTokenizer;
-
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.FileSplit;
@@ -14,12 +11,6 @@ import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.JobConf;
 
-/**
- * LineIndexMapper
- *
- * Maps each observed word in a line to a (filename@offset) string.
- *
- */
 public class LetterCountMapper extends MapReduceBase
     implements Mapper<LongWritable, Text, Text, Text> {
 
@@ -28,8 +19,10 @@ public class LetterCountMapper extends MapReduceBase
   public void map(LongWritable key, Text value, OutputCollector<Text, Text> output,
       Reporter reporter) throws IOException {
 	    
+	    //Split string into array of chars. Remove all characters that are not in [a-z^A-Z]  
 	    char[] letterArray = value.toString().replaceAll("[^a-z^A-Z]","").toCharArray();
 	   
+	    //For each letter send it to the reducer
 	    for(int i=0; i<letterArray.length; i++){
 	    	output.collect( new Text(String.valueOf(letterArray[i])), new Text("1"));
 	    }

@@ -1,5 +1,3 @@
-// (c) Copyright 2009 Cloudera, Inc.
-
 package wordStat;
 
 import java.io.IOException;
@@ -17,13 +15,6 @@ import org.apache.hadoop.mapred.JobConf;
 
 import java.util.Random;
 
-/**
- * LineIndexReducer
- *
- * Takes a list of filename@offset entries for a single word and concatenates
- * them into a list.
- *
- */
 public class WordStatReducer extends MapReduceBase
     implements Reducer<Text, Text, Text, Text> {
 
@@ -35,35 +26,47 @@ public class WordStatReducer extends MapReduceBase
 	  int N = 0;
 	  int n_i = 0;
 	  String w_i;
+	  //Array of all the words
 	  List<String> wordList = new ArrayList<String>();
+	  //Array of the sum 
 	  List<Integer> sumList = new ArrayList<Integer>(); 
 	  
 	  while (values.hasNext()) {
+		  //Create the array Payload containin the word and the number of words
+		  String payload[] = values.next().toString().split(" ");
 		  //Extract the pair from the string
-		  w_i = values.next().toString().split(" ")[0];
-		  n_i = Integer.parseInt(values.next().toString().split(" ")[1]);  
+		  w_i = payload[0];
+		  n_i = Integer.parseInt(payload[1]);  
+		  //If the mapper processed a string containing no chars, we want
+		  //n_i is 0. 
 		  if(n_i>0){
 			  N += n_i;
 			  wordList.add(w_i);
+			  //Add the accumulated sum
 			  sumList.add(N);
 		  }
 	  }
 
-	  Random rndGenerator = new Random(java.util.Calendar.getInstance().getTimeInMillis());
-	   
+	  //Seed random generator as explained in the assignment
+	  Random rndGenerator = new Random(java.util.Calendar.getInstance().getTimeInMillis()); 
+	  //Select random number in the interval [0,N]
 	  int rndNumber = rndGenerator.nextInt(N);
+	  
+	  //Find the place in the word array where the picked word is
+	  //The word is again picked with uniform probability, since
+	  //the sumList contains the accumulated number of occurrences the number of words
 	  int i = 0;
 	  while(sumList.get(i)<rndNumber){
 		i++;    
 	  }
-		  
+	  
+	  //Store the picked word
 	  String pickedWord = wordList.get(i);
-	  
-	  output.collect(key, new Text(Integer.toString(N) + " " + pickedWord));
-	  
-	  
-
-
+	  //Send it to the output
+	  output.collect(key, new Text(Integer.toString(N) + " " + pickedWord));  
   }
 }
+
+
+
 

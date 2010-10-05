@@ -1,5 +1,3 @@
-// (c) Copyright 2009 Cloudera, Inc.
-
 package wordStat;
 
 import java.io.IOException;
@@ -16,13 +14,6 @@ import org.apache.hadoop.mapred.JobConf;
 
 import java.util.Random;
 
-
-/**
- * LineIndexMapper
- *
- * Maps each observed word in a line to a (filename@offset) string.
- *
- */
 public class WordStatMapper extends MapReduceBase
     implements Mapper<LongWritable, Text, Text, Text> {
 
@@ -38,15 +29,18 @@ public class WordStatMapper extends MapReduceBase
 	  int numberOfWords = wordArray.length;
 	  
 	  //Pick one random word from the word array. This works because the word array
-	  //contains all the words incl. dublicates. Eg. "one on one" becomes ["one", "on", "one"]
-	  //when selecting a random word in this array, the probability to hit one is still 2/3.
-	  String pickedWord;
+	  //contains all the words including any duplicates. E.x. "one on one" becomes ["one", "on", "one"]
+	  //when selecting a random word in this array, the probability to hit "one" is still 2/3.
+	  String pickedWord = "";
+	  
 	  if(numberOfWords>0){
+		  //If we are not operating on a blank line, i.e. a line which only contains blank chars.
 		  Random rndGenerator = new Random( key.get() + java.util.Calendar.getInstance().getTimeInMillis());
+		  //The word is here picked with uniform probability, from the set consisting
+		  //of all the words in the string. 
 		  pickedWord = wordArray[rndGenerator.nextInt(numberOfWords)];
-	  }else{
-		  pickedWord = "";
 	  }
+	 
 	  //Send it to the reducer
 	  output.collect( new Text("key"), new Text(pickedWord +" " + Integer.toString(numberOfWords)));
 	 
