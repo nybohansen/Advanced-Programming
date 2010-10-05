@@ -20,7 +20,7 @@ public class LetterCountMapper extends MapReduceBase
       Reporter reporter) throws IOException {
 	    
 	    //Split string into array of chars. Remove all characters that are not in [a-z^A-Z]  
-	    char[] letterArray = value.toString().replaceAll("[^a-z^A-Z]","").toCharArray();
+	    char[] letterArray = value.toString().toLowerCase().replaceAll("[^a-z]","").toCharArray();
 	   
 	    //For each letter send it to the reducer
 	    for(int i=0; i<letterArray.length; i++){
