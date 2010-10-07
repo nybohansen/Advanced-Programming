@@ -74,16 +74,30 @@ In the reducer a random integer, \texttt{rndNumber}, in the interval $[0,N]$ is 
 The program letterCount can be implemented in Sawzall as 
 
 
-\begin{verbatim}
-  //letters is defined as a aggregator
-  //It sums up the table grouped by key
+\begin{lstlisting}
+  // letters is defined as a aggregator
+  // It sums up the table grouped by key
   letters: table sum[key: char] of int;
-  //input is a single letter, that is, the input is split up 
-  //into letters before the sawzall program is called
+  // input is a single letter, that is, the input is split up 
+  // into letters before the sawzall program is called
   x: bytes = input;
-  //Send 1 to the aggregator along with the key
+  // Send 1 to the aggregator along with the key
   emit letters[x] <- 1  
-\end{verbatim}
+\end{lstlisting}
+
+And the wordStat program could be implemented like
+
+
+\begin{lstlisting}
+	// We want to count the number of words
+	count: table sum of int
+	// and we want to select one of them at random
+	words: table sample(1) of bytes
+	// For each word, ++
+	emit count <- 1
+	// Just emit each word
+	emit words <- input
+\end{lstlisting}
 
 % section sawzall_implementation (end)
                
