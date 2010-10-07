@@ -48,12 +48,14 @@ frame=single,             % [none, single, double]
 
 \section{Introduction} % (fold)
 \label{sec:introduction}
-For this weeks assignment we had to create two small programs in java, utilizing the Hadoop framework. 
+For this weeks assignment we had to create two small programs in Java, utilizing the Hadoop framework. 
 
-The first program should count the letters in a string, and output each letter and the number of occurrences. We have called this program \texttt{letterCount}.
+The first program should count the letters in a text, and output each letter and the number of occurrences. 
+We have called this program \texttt{letterCount}.
 
-
-The second program should output a number $N$ and a word. The word should be chosen with probability $\frac{1}{N}$ where $N$ is the total number of words in the input text. We have called this program \texttt{wordStat}.
+The second program should output a number $N$ and a word.
+The word should be chosen with probability $\frac{1}{N}$, where $N$ is the total number of words in the input text. 
+We have called this program \texttt{wordStat}.
 
 Both programs should also be implemented in the Sawzall programming language.
 % section introduction (end)
@@ -64,15 +66,17 @@ Uniform probability means that all elements have equal probability $1/n$ where $
 
 We can explain the way our implementation works, by looking at it backwards. 
 
-In the reducer a random integer, \texttt{rndNumber}, in the interval $[0,N]$ is generated. \texttt{rndNumber} and can be thought of as choosing a word by uniform probability since $N$ is the total number of words. \texttt{rndNumber} refers to a section of the total text. In this section, we have already chosen a word with uniform probability, namely $w_i$. This is why the output word is chosen by uniform probability.
+In the reducer a random integer, \texttt{rndNumber}, in the interval $[0,N]$ is generated. 
+\texttt{rndNumber} and can be thought of as choosing a word by uniform probability since $N$ is the total number of words. 
+\texttt{rndNumber} refers to a section of the total text. 
+In this section, we have already chosen a word with uniform probability, namely $w_i$. 
+This is why the output word is chosen by uniform probability.
 
 % section uniform_probability (end)
-
-
+\pagebreak
 \section{Sawzall implementation} % (fold)
 \label{sec:sawzall_implementation}
-The program letterCount can be implemented in Sawzall as 
-
+The program letterCount can be implemented in Sawzall like so: 
 
 \begin{lstlisting}
   // letters is defined as a aggregator
@@ -85,8 +89,7 @@ The program letterCount can be implemented in Sawzall as
   emit letters[x] <- 1  
 \end{lstlisting}
 
-And the wordStat program could be implemented like
-
+And the wordStat program could be implemented like this:
 
 \begin{lstlisting}
 	// We want to count the number of words
@@ -100,29 +103,30 @@ And the wordStat program could be implemented like
 \end{lstlisting}
 
 % section sawzall_implementation (end)
-               
-
 
 \section{Test programs}
-We have tested both programs on a simple example, consisting of a file containing the string "one on one", and a more advanced example consisting of the provided Shakespeare file.
+We have tested both programs on a simple example, a file containing the string "one on one", and a more advanced example, the provided Shakespeare file.
 
 \subsection{Test of assignment 1} % (fold)
 \label{sub:assignment_1}
-The first test run on the letterCount program is the simple one consisting of the string "one on one". The output of the program is
+\texttt{letterCount} returned the following when the input file only contained the string "one on one":
 \begin{verbatim}
   e	2
   n	3
   o	3
 \end{verbatim}
-which is the same as if we did a manuel count.
 
-The second test of the letterCount program, the program is run with the provided Shakespeare file as input. The output of the program can bee seen in appendix 1.
+With this simple string, we can count and verify this ourselves.
+
+For the second test of the \texttt{letterCount} program, the program is run with the provided Shakespeare file as input. 
+The output of the program can bee seen in appendix 1.
 % subsection assignment_1 (end)
 
 \subsection{Test of assignment 2} % (fold)
 \label{sub:assignment_2}
 
-To test the wordStat program, the program is run with the input $one on one$ three times. The output of the program is
+To test the \texttt{wordStat} program, the program is run with the input "one on one" five times. 
+The output of the five runs are:
 
 \begin{verbatim}  
   3 on
@@ -132,7 +136,8 @@ To test the wordStat program, the program is run with the input $one on one$ thr
   3 on  
 \end{verbatim}
 
-Furthermore we have tested this program with the provided shakespeare file as well. The output of the wordStat program when tested with the shakespeare file is
+Furthermore we have tested this program with the provided Shakespeare file as well. 
+The output of the \texttt{wordStat} program when tested with the Shakespeare file is
 
 \begin{verbatim}
   1082023 Porter
@@ -147,7 +152,7 @@ Furthermore we have tested this program with the provided shakespeare file as we
 \newpage
 \section*{Appendix 1} % (fold)
 \label{sec:appendix_1}
-Output of character count program when run on shakespeare
+Output of character count program when run on the Shakespeare file
 \begin{verbatim}
   a	307310
   b	63387
