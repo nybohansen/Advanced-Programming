@@ -71,10 +71,22 @@ In the reducer a random integer, \texttt{rndNumber}, in the interval $[0,N]$ is 
 
 \section{Sawzall implementation} % (fold)
 \label{sec:sawzall_implementation}
-The program letterCount ca be implemented in Sawzall as
+The program letterCount can be implemented in Sawzall as 
 
+
+\begin{verbatim}
+  //letters is defined as a aggregator
+  //It sums up the table grouped by key
+  letters: table sum[key: char] of int;
+  //input is a single letter, that is, the input is split up 
+  //into letters before the sawzall program is called
+  x: bytes = input;
+  //Send 1 to the aggregator along with the key
+  emit letters[x] <- 1  
+\end{verbatim}
 
 % section sawzall_implementation (end)
+               
 
 
 \section{Test programs}
@@ -356,6 +368,10 @@ public class WordStatReducer extends MapReduceBase
 }  
 \end{lstlisting}
 % subsection wordstatreducer (end)
+
+
+% \lstinputlisting{../Assignment1/src/letter/LetterCountMapper.java}
+
 
 % section source_code (end)
 
