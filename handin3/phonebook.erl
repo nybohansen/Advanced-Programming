@@ -4,7 +4,7 @@
 %% @copyright Ken Friis Larsen 2009-2010
 
 -module(phonebook).
--export([start/0, add/2, list_all/1, update/2]).
+-export([start/0, add/2, list_all/1, update/2, delete/2, lookup/2]).
 
 %% Interface
 
@@ -18,7 +18,12 @@ list_all(Pid) ->
 
 update(Pid, Contact) ->
     rpc(Pid, {update, Contact}).
-
+    
+delete(Pid, Contact) ->
+    rpc(Pid, {delete, Contact}).
+    
+lookup(Pid, Name) ->
+    rpc(Pid, {lookup, Name}).
 
 %% Internal implementation
 
@@ -52,9 +57,19 @@ handle_request(Request, Contacts) ->
             {{ok, lists:map(fun({_, C}) -> C end, List)},
              Contacts};
         {update, Contact} ->
-	    {Name,_,_} = Contact,
+	        {Name,_,_} = Contact,
             {ok,
              dict:store(Name, Contact, Contacts)};
+        {delete, Contact} ->
+            {Name,_,_} = Contact,
+            {ok,
+             dict:erase(Name, Contacts)};
+        {lookup, Name} ->
+            case dict:is_key(Name, Contacts) of
+                true -> {dict:fetch(Name, Contacts), Contacts};
+                false -> {{error, Name, not_found},
+                          Contacts}
+            end;
         Other ->
             {{error,unknown_request, Other},
              Contacts}
