@@ -21,19 +21,26 @@ emptyLoop() ->
     emptyLoop().
 
 add(Pid, Contact) ->
-    rpc(Pid, {add, Contact}).
+    {Name,_,_} = Contact,
+    Peer = findCorrectPeer(Pid, erlang:md5(Name)),
+    rpc(Peer, {add, Contact}).
 
 list_all(Pid) ->
     rpc(Pid, list_all).
 
 update(Pid, Contact) ->
-    rpc(Pid, {update, Contact}).
+    {Name,_,_} = Contact,
+    Peer = findCorrectPeer(Pid, erlang:md5(Name)),
+    rpc(Peer, {update, Contact}).
     
 delete(Pid, Contact) ->
-    rpc(Pid, {delete, Contact}).
+    {Name,_,_} = Contact,
+    Peer = findCorrectPeer(Pid, erlang:md5(Name)),
+    rpc(Peer, {delete, Contact}).
     
 lookup(Pid, Name) ->
-    rpc(Pid, {lookup, Name}).
+    Peer = findCorrectPeer(Pid, erlang:md5(Name)),
+    rpc(Peer, {lookup, Name}).
 
 join(NewPeer, InNetPeer) -> 
     rpc(NewPeer, {join, InNetPeer, both}).
@@ -56,17 +63,11 @@ rpc(Pid, Request) ->
 loop(Contacts, Name, GUID, Left, Right) ->
     receive
 	{From, Request} ->
-	    io:format("~p ~p ~n my left is ~p~n my right is ~p~n my contacts are ~p~n~n", [Name, GUID, Left, Right, dict:to_list(Contacts)]),
+	    %io:format("~p ~p ~n my left is ~p~n my right is ~p~n my contacts are ~p~n~n", [Name, GUID, Left, Right, dict:to_list(Contacts)]),
 	    {Res, Updated, NewLeft, NewRight} = handle_request(Request, Contacts, GUID, Left, Right),
 	    From ! {self(), Res}
     end,
     loop(Updated, Name, GUID, NewLeft, NewRight).
-
-findAtOthers(Contact, Name, Left, Right) -> 
-    case erlang:md5(Name) < erlang:md5(Contact) of
-        true -> Left ! {self(), {lookup, Contact}};
-        false -> Right ! {self(), {lookup, Contact}}
-    end.
     
 getGUID(Pid) ->
     {_, _, GUID} = rpc(Pid, get_info),
@@ -115,12 +116,12 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
         {add, Contact} -> 
             {Name,_,_} = Contact,
             case dict:is_key(Name, Contacts) of 
-                false -> {ok, 
-                          dict:store(Name, Contact, Contacts), 
-                          Left, 
-                          Right};
                 true  -> {{error, Name, is_already_there},
                           Contacts, 
+                          Left, 
+                          Right};
+                false -> {ok, 
+                          dict:store(Name, Contact, Contacts), 
                           Left, 
                           Right}
             end;
@@ -148,32 +149,22 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
                          Contacts, 
                          Left, 
                          Right};
-                false -> 
-                    case findAtOthers(Name, GUID, Left, Right) of
-                        {found, Contact} -> {Contact, 
-                                             Contacts,
-                                             Left,
-                                             Right};
-                        end_of_line -> {{error, Name, not_found}, 
-                                        Contacts, 
-                                        Left, 
-                                        Right}
-                    end
+                false -> {{error, Name, not_found}, 
+                          Contacts, 
+                          Left, 
+                          Right}
             end;
         {split_contacts, AtGUID} ->
             case AtGUID < GUID of
                 true -> ToHigh = fun(Name, _) -> erlang:md5(Name) < GUID end;
                 false -> ToHigh = fun(Name, _) -> AtGUID < erlang:md5(Name) end
             end,
-            io:format("Lets filter~n"),   
             Higher = dict:filter(ToHigh, Contacts),
-            io:format("Lets filter 2nd~n"),   
-            Lower = dict:filter(fun(N,C) -> not ToHigh(N,C) end, Contacts),
-            io:format("Finished filtering~n"),   
+            Lower = dict:filter(fun(N,C) -> not ToHigh(N,C) end, Contacts),  
             {Higher,
+             Lower, 
              Left,
-             Right,
-             Lower};
+             Right};
         {new_neighbours, AtGUID, NewPeer} ->
             case AtGUID < GUID of
                 true -> {{Left, self()},
@@ -193,6 +184,7 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
         {join, InNetPeer, Dir} ->
             joinEmAll(InNetPeer, Left, Right, Dir),
             Peer = findCorrectPeer(InNetPeer, GUID),
+            dict:map(fun(_, C) -> add(InNetPeer, C) end, Contacts),
             NewContacts = splitContacts(Peer, GUID),
             {NewLeft, NewRight} = newNeighbours(Peer, GUID, self()),
             {ok, 
@@ -219,4 +211,4 @@ test() -> P1 = start("P1"),
           P2 = start("P2"),
           join(P2, P1),
           add(P2, {"Ken", "Ryumgaårdvej", "21424"}),
-          lookup(P2, "Ken").
+          lookup(P1, "Ken").
