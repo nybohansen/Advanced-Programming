@@ -26,7 +26,13 @@ add(Pid, Contact) ->
     rpc(Peer, {add, Contact}).
 
 list_all(Pid) ->
-    rpc(Pid, list_all).
+    rpc(Pid, {list_all, both}).
+    
+list_all(Pid, Dir) ->
+    case getActive(Pid) of
+        end_of_line -> {ok, []};
+        _ -> rpc(Pid, {list_all, Dir})
+    end.
 
 update(Pid, Contact) ->
     {Name,_,_} = Contact,
@@ -125,9 +131,16 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
                           Left, 
                           Right}
             end;
-        list_all ->
-            List = dict:to_list(Contacts),
-            {{ok, lists:map(fun({_, C}) -> C end, List)},
+        {list_all, Dir} ->
+            case Dir of
+                left -> {_, NewList} = list_all(Left, left);
+                right -> {_, NewList} = list_all(Right, right);
+                _ -> {_, NewListL} = list_all(Left, left),
+                     {_, NewListR} = list_all(Right, right),
+                     NewList = NewListL ++ NewListR
+            end,
+            List = lists:map(fun({_, C}) -> C end, dict:to_list(Contacts)) ++ NewList,
+            {{ok, List},
              Contacts, 
              Left, 
              Right};
@@ -145,7 +158,7 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
              Right};
         {lookup, Name} ->
             case dict:is_key(Name, Contacts) of
-                true -> {dict:fetch(Name, Contacts), 
+                true -> {{ok, dict:fetch(Name, Contacts)}, 
                          Contacts, 
                          Left, 
                          Right};
@@ -154,6 +167,17 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
                           Left, 
                           Right}
             end;
+        {join, InNetPeer, Dir} ->
+            joinEmAll(InNetPeer, Left, Right, Dir),
+            dict:map(fun(_, C) -> add(InNetPeer, C) end, Contacts),
+            Peer = findCorrectPeer(InNetPeer, GUID),
+            NewContacts = splitContacts(Peer, GUID),
+            {NewLeft, NewRight} = newNeighbours(Peer, GUID, self()),
+            {ok, 
+             NewContacts, 
+             NewLeft, 
+             NewRight};            
+            
         {split_contacts, AtGUID} ->
             case AtGUID < GUID of
                 true -> ToHigh = fun(Name, _) -> erlang:md5(Name) < GUID end;
@@ -181,16 +205,6 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
              Contacts,
              Left,
              Right};
-        {join, InNetPeer, Dir} ->
-            joinEmAll(InNetPeer, Left, Right, Dir),
-            Peer = findCorrectPeer(InNetPeer, GUID),
-            dict:map(fun(_, C) -> add(InNetPeer, C) end, Contacts),
-            NewContacts = splitContacts(Peer, GUID),
-            {NewLeft, NewRight} = newNeighbours(Peer, GUID, self()),
-            {ok, 
-             NewContacts, 
-             NewLeft, 
-             NewRight};
         Other ->
             {{error, unknown_request, Other},
              Contacts, 
@@ -207,8 +221,9 @@ jointest() -> P1 = start("P1"),
 
 test() -> P1 = start("P1"),
           add(P1, {"Kasper", "Somewhere on Amager", "4321-012"}),
-          add(P1, {"Mads Ohm Larsen", "Planet Earth", "555-DONT-CALL"}),
+          add(P1, {"Mads", "Planet Earth", "555-DONT-CALL"}),
           P2 = start("P2"),
           join(P2, P1),
           add(P2, {"Ken", "Ryumgaårdvej", "21424"}),
-          lookup(P1, "Ken").
+          lookup(P2, "Mads"),
+          list_all(P1).
