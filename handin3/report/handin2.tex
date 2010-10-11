@@ -1,0 +1,78 @@
+\documentclass[10pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+
+% Package for including code in the document
+\usepackage{listings}
+\usepackage{color}
+\definecolor{blue}{rgb}{0,0,0.8}
+\definecolor{green}{rgb}{0,0.5,0}
+\definecolor{red}{rgb}{0.5,0,0}
+\definecolor{grey}{rgb}{0.5,0.5,0.5}
+\lstset{language=Erlang, 
+numbers=left,           % where to put the line-numbers
+numberstyle=\tiny,      % size and font of line-numbers
+stepnumber=2,           % step between two line-numbers.
+numbersep=10pt,         % distance between line-numbers and the code
+basicstyle= \ttfamily \footnotesize,  % size and fonts of the code
+breaklines=true,        % wrap lines?
+showstringspaces=false, % underline spaces within strings
+tabsize=2,              % replace tabs with # of spaces
+identifierstyle=\color{black},
+keywordstyle=\color{blue},
+stringstyle=\color{green},
+commentstyle=\color{grey},
+inputencoding=utf8x,    % text encoding
+extendedchars=true,     % exotic characters?
+frame=single,             % [none, single, double]
+}
+
+% Verbatim envivorment
+\usepackage{verbatim} 
+
+% Uncomment if you want to use Palatino as font
+\usepackage[sc]{mathpazo}
+\linespread{1.05}         % Palatino needs more leading (space between lines)
+
+\title{Advanced Programming \\\small{Assignment 3} - \texttt{Mayo Peer-to-Peer}}
+\author{Kasper Nybo Hansen and Mads Ohm Larsen}
+
+\date{\today}
+
+\begin{document}
+	
+\maketitle
+
+\section{Introduction} % (fold)
+\label{sec:introduction}
+This week we had to create a concurrent peer-to-peer (P2P) phonebook program in Erlang.
+The implementation should be an API that allows the following operations:
+
+\begin{itemize}
+	\item Add a contact
+	\item List all contacts
+	\item Update a contact, given the name
+	\item Delete a contact, given the name
+	\item Find a contact, given the name
+\end{itemize}
+
+The individual peers should also be able to join the network and share the contacts.
+% section introduction (end)
+
+\section{The Mayo Routing Algorithm} % (fold)
+\label{sec:the_mayo_routing_algorithm}
+We are using the Mayo Routing Algorithm to maintain our contacts in our phonebook.
+Each peer have got a GUID, which is a 128-bit MD5-hash of their name.
+Each peer have got the contacts which has a higher MD5-hash than the peer, up til the next peer.
+The left most peer have also got the contacts below.
+
+When doing this there were some thing we had to take into mind.
+What happens if $P_1$ and $P_2$ makes a network together, and shares some contacts, and $P_3$ and $P_4$ makes a networks and shares some contacts, and $P_3$ joins $P_1$?
+In our implementation this results in the $P_3$/$P_4$ network all call the \texttt{join}-method on $P_1$, and are routed into the correct place.
+The contacts are also all given to $P_1$, which finds the correct peer for the contact, and gives it to that peer (Might be $P_3$ or $P_4$, but could equally likely be $P_2$).
+
+
+% section the_mayo_routing_algorithm (end)
+\end{document}
