@@ -12,7 +12,9 @@ start(Name) -> GUID = erlang:md5(Name),
 %% Loop which always responds with end_of_line
 emptyLoop() ->
     receive
-        {From, _} -> From ! {self(), end_of_line}
+        {From, _} -> 
+            %io:format("  Empty process (~p) called with ~p~n", [self(), R]),
+            From ! {self(), end_of_line}
     end,
     emptyLoop().
 
@@ -56,11 +58,28 @@ lookup(Pid, Name) ->
 
 %% Join the network via InNetPeer
 join(NewPeer, InNetPeer) -> 
-    rpc(NewPeer, {join, InNetPeer, both}).
-    
-%% Utility method for the join-call
-join(NewPeer, InNetPeer, Dir) -> 
-    rpc(NewPeer, {join, InNetPeer, Dir}).
+    {Left, Right} = rpc(NewPeer, {join, InNetPeer}),
+    case isActive(Left) of
+        true -> neighbourJoin(Left, InNetPeer, left);
+        _ -> not_active
+    end,
+    case isActive(Right) of 
+        true -> neighbourJoin(Right, InNetPeer, right);
+        _ -> not_active
+    end,
+    ok.
+
+neighbourJoin(NewPeer, InNetPeer, Dir) ->
+    {Left, Right} = rpc(NewPeer, {join, InNetPeer}),
+    case Dir of
+        left -> Neighbour = Left;
+        right -> Neighbour = Right
+    end,
+    case isActive(Neighbour) of 
+        true -> neighbourJoin(Neighbour, InNetPeer, Dir);
+        _ -> not_active
+    end,
+    ok.
 
 %% Split the contacts at AtGUID
 splitContacts(Pid, AtGUID) ->
@@ -78,15 +97,34 @@ rpc(Pid, Request) ->
 loop(Contacts, Name, GUID, Left, Right) ->
     receive
 	{From, Request} ->
-	    {Res, Updated, NewLeft, NewRight} = handle_request(Request, Contacts, GUID, Left, Right),
+%	    io:format("In your loop ~p~n", [Name]),
+	    {Res, Updated, NewLeft, NewRight} = handle_request(Request, Contacts, Name, GUID, Left, Right),
 	    From ! {self(), Res}
     end,
     loop(Updated, Name, GUID, NewLeft, NewRight).
 
 %% Get the GUID of Pid    
 getGUID(Pid) ->
-    {_, _, GUID} = rpc(Pid, get_info),
+    {_, _, _, GUID} = rpc(Pid, get_info),
     GUID.
+
+%% Get the GUID of Pid    
+%getName(Pid) ->
+%    {_, _, Name, _} = rpc(Pid, get_info),
+%    Name.
+    
+%% Get the Name of Pid
+printChain(Pid) ->
+    case isActive(Pid) of
+        true  -> rpc(Pid, {print_chain, both});
+        false -> "end"
+    end.
+    
+printChain(Pid, Dir) ->
+    case isActive(Pid) of
+        true  -> rpc(Pid, {print_chain, Dir});
+        false -> "end"
+    end.
     
 %% Checks if the Pid is an active peer in the network
 isActive(Pid) ->
@@ -97,7 +135,7 @@ isActive(Pid) ->
 
 %% Get either left or right neighbour of Pid
 getNeighbour(Pid, Neighbour) ->
-    {Left, Right, _} = rpc(Pid, get_info),
+    {Left, Right, _, _} = rpc(Pid, get_info),
     case Neighbour of
         left  -> Left;
         right -> Right
@@ -105,6 +143,7 @@ getNeighbour(Pid, Neighbour) ->
 
 %% Find the correct peer given GUID
 findCorrectPeer(InNetPeer, GUID) ->
+    %io:format("  (~p) trying to find correct peer via (~p)~n", [self(), InNetPeer]),
     case GUID < getGUID(InNetPeer) of
         true -> LeftPeer = getNeighbour(InNetPeer, left),
                 case isActive(LeftPeer) of
@@ -125,8 +164,11 @@ findCorrectPeer(InNetPeer, GUID) ->
 newNeighbours(Pid, GUID, NewPeer) ->
     rpc(Pid, {new_neighbours, GUID, NewPeer}).
 
+newNeighbour(Pid, Neighbour, Dir) ->
+    rpc(Pid, {new_neighbour, Neighbour, Dir}).
+
 %% Handles all the requests from the remote procedure calls
-handle_request(Request, Contacts, GUID, Left, Right) ->
+handle_request(Request, Contacts, MyName, GUID, Left, Right) ->
     case Request of
         %% The add method already finds the correct peer, so we just add the contact
         {add, Contact} -> 
@@ -182,24 +224,18 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
                           Right}
             end;
         %% Lets join InNetPeer's network
-        {join, InNetPeer, Dir} ->
-            %% Add all our contacts to InNetPeer's network
-            dict:map(fun(_, C) -> add(InNetPeer, C) end, Contacts),
+        {join, InNetPeer} ->
+            %io:format("I am ~p (~p), trying to join ~p~n", [MyName, self(), getName(InNetPeer)]),
             %% Grab the correct peer, split his contacts, find new neighbours
             Peer                = findCorrectPeer(InNetPeer, GUID),
+            %% Add all our contacts to InNetPeer's network
+            dict:map(fun(_, C) -> add(Peer, C) end, Contacts),
             NewContacts         = splitContacts(Peer, GUID),
             {NewLeft, NewRight} = newNeighbours(Peer, GUID, self()),
-            %% Tell all our own peers to join the same network
-            case Dir of
-                left  -> join(Left,  InNetPeer, left);
-                right -> join(Right, InNetPeer, right);
-                _     -> join(Left,  InNetPeer, left),
-                         join(Right, InNetPeer, right)
-            end,
-            {ok, 
+            {{Left, Right}, 
              NewContacts, 
              NewLeft, 
-             NewRight};            
+             NewRight};
         
         %%%%
         %% Utility rpcs
@@ -219,18 +255,47 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
         %% Find new neighbours
         {new_neighbours, AtGUID, NewPeer} ->
             case AtGUID < GUID of
-                true -> {{Left, self()},
-                         Contacts,
-                         NewPeer,
-                         Right};
-                false -> {{self(), Right},
+                true  -> newNeighbour(Left, NewPeer, right),
+                         {{Left, self()},
+                          Contacts,
+                          NewPeer,
+                          Right};
+                false -> newNeighbour(Right, NewPeer, left),
+                         {{self(), Right},
                           Contacts,
                           Left,
                           NewPeer}
             end;
+        {new_neighbour, Neighbour, Dir} ->
+            case Dir of 
+                left  -> {ok,
+                          Contacts,
+                          Neighbour,
+                          Right};
+                right -> {ok,
+                          Contacts,
+                          Left,
+                          Neighbour}
+             end;
+        %% Print the chain
+        {print_chain, Dir} ->
+            case Dir of
+                left  -> {printChain(Left, left) ++ " - " ++ MyName,
+                          Contacts,
+                          Left,
+                          Right};
+                right -> {MyName ++ " - " ++ printChain(Right, right),
+                          Contacts,
+                          Left,
+                          Right};
+                _     -> {printChain(Left, left) ++ " - " ++ MyName ++ " - " ++ printChain(Right, right),
+                          Contacts,
+                          Left,
+                          Right}
+            end;
         %% Get info about neighbours and GUID
         get_info ->
-            {{Left, Right, GUID},
+            {{Left, Right, MyName, GUID},
              Contacts,
              Left,
              Right};
@@ -241,6 +306,9 @@ handle_request(Request, Contacts, GUID, Left, Right) ->
              Left, 
              Right}
     end.
+
+%getInfo(Pid) -> 
+%    rpc(Pid, get_info).
 
 %% Test
 test() -> P1 = start("P1"),
@@ -256,8 +324,7 @@ test() -> P1 = start("P1"),
           add(P4, {"Daisy Duck", "Unknown", "12345678"}),
           join(P3, P4),
           join(P4, P1),
-          list_all(P4).
-          % Doesn't work with P3 and P4? Endless loop
+          lookup(P3, "Daisy Duck").
 
 jointest() -> P1 = start("P1"),
               P2 = start("P2"),
@@ -266,6 +333,4 @@ jointest() -> P1 = start("P1"),
               join(P2, P1),
               join(P4, P3),
               join(P3, P2),
-              add(P1, {"Donald Duck", "Duckburg", "1313-13-1313"}),
-              lookup(P4, "Donald Duck").
-              % Endless loop for P4
+              printChain(P4).
