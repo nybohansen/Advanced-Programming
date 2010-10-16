@@ -13,14 +13,13 @@ start(Name) -> GUID = erlang:md5(Name),
 emptyLoop() ->
     receive
         {From, _} -> 
-            %io:format("  Empty process (~p) called with ~p~n", [self(), R]),
-            From ! {self(), end_of_line}
-    end,
-    emptyLoop().
+            From ! {self(), end_of_line},
+            emptyLoop()
+    end.
 
 %% Add a contact to the given Pid
 add(Pid, Contact) ->
-    {Name,_,_} = Contact,
+    {Name, _, _} = Contact,
     %% Find the correct peer for the contact
     Peer = findCorrectPeer(Pid, erlang:md5(Name)),
     rpc(Peer, {add, Contact}).
@@ -38,17 +37,16 @@ list_all(Pid, Dir) ->
 
 %% Update a contact
 update(Pid, Contact) ->
-    {Name,_,_} = Contact,
+    {Name, _, _} = Contact,
     %% Find the correct peer for the contact
     Peer = findCorrectPeer(Pid, erlang:md5(Name)),
     rpc(Peer, {update, Contact}).
 
 %% Delete a contact
-delete(Pid, Contact) ->
-    {Name,_,_} = Contact,
+delete(Pid, Name) ->
     %% Find the correct peer for the contact
     Peer = findCorrectPeer(Pid, erlang:md5(Name)),
-    rpc(Peer, {delete, Contact}).
+    rpc(Peer, {delete, Name}).
     
 %% Lookup a contact
 lookup(Pid, Name) ->
@@ -61,23 +59,23 @@ join(NewPeer, InNetPeer) ->
     {Left, Right} = rpc(NewPeer, {join, InNetPeer}),
     case isActive(Left) of
         true -> neighbourJoin(Left, InNetPeer, left);
-        _ -> not_active
+        _    -> not_active
     end,
     case isActive(Right) of 
         true -> neighbourJoin(Right, InNetPeer, right);
-        _ -> not_active
+        _    -> not_active
     end,
     ok.
 
 neighbourJoin(NewPeer, InNetPeer, Dir) ->
     {Left, Right} = rpc(NewPeer, {join, InNetPeer}),
     case Dir of
-        left -> Neighbour = Left;
+        left  -> Neighbour = Left;
         right -> Neighbour = Right
     end,
     case isActive(Neighbour) of 
         true -> neighbourJoin(Neighbour, InNetPeer, Dir);
-        _ -> not_active
+        _    -> not_active
     end,
     ok.
 
@@ -97,21 +95,15 @@ rpc(Pid, Request) ->
 loop(Contacts, Name, GUID, Left, Right) ->
     receive
 	{From, Request} ->
-%	    io:format("In your loop ~p~n", [Name]),
 	    {Res, Updated, NewLeft, NewRight} = handle_request(Request, Contacts, Name, GUID, Left, Right),
-	    From ! {self(), Res}
-    end,
-    loop(Updated, Name, GUID, NewLeft, NewRight).
+	    From ! {self(), Res},
+	    loop(Updated, Name, GUID, NewLeft, NewRight)
+    end.
 
 %% Get the GUID of Pid    
 getGUID(Pid) ->
     {_, _, _, GUID} = rpc(Pid, get_info),
     GUID.
-
-%% Get the GUID of Pid    
-%getName(Pid) ->
-%    {_, _, Name, _} = rpc(Pid, get_info),
-%    Name.
     
 %% Get the Name of Pid
 printChain(Pid) ->
@@ -143,7 +135,6 @@ getNeighbour(Pid, Neighbour) ->
 
 %% Find the correct peer given GUID
 findCorrectPeer(InNetPeer, GUID) ->
-    %io:format("  (~p) trying to find correct peer via (~p)~n", [self(), InNetPeer]),
     case GUID < getGUID(InNetPeer) of
         true -> LeftPeer = getNeighbour(InNetPeer, left),
                 case isActive(LeftPeer) of
@@ -164,6 +155,7 @@ findCorrectPeer(InNetPeer, GUID) ->
 newNeighbours(Pid, GUID, NewPeer) ->
     rpc(Pid, {new_neighbours, GUID, NewPeer}).
 
+%% Utility method for newNeighbours
 newNeighbour(Pid, Neighbour, Dir) ->
     rpc(Pid, {new_neighbour, Neighbour, Dir}).
 
@@ -172,7 +164,7 @@ handle_request(Request, Contacts, MyName, GUID, Left, Right) ->
     case Request of
         %% The add method already finds the correct peer, so we just add the contact
         {add, Contact} -> 
-            {Name,_,_} = Contact,
+            {Name, _, _} = Contact,
             case dict:is_key(Name, Contacts) of 
                 true  -> {{error, Name, is_already_there},
                           Contacts, 
@@ -199,14 +191,13 @@ handle_request(Request, Contacts, MyName, GUID, Left, Right) ->
              Right};
         %% The update method already finds the correct peer, so we just update the contact
         {update, Contact} ->
-	        {Name,_,_} = Contact,
+	        {Name, _, _} = Contact,
             {ok,
              dict:store(Name, Contact, Contacts), 
              Left, 
              Right};
         %% The delete method already finds the correct peer, so we just delete the contact
-        {delete, Contact} ->
-            {Name,_,_} = Contact,
+        {delete, Name} ->
             {ok,
              dict:erase(Name, Contacts), 
              Left, 
@@ -225,7 +216,6 @@ handle_request(Request, Contacts, MyName, GUID, Left, Right) ->
             end;
         %% Lets join InNetPeer's network
         {join, InNetPeer} ->
-            %io:format("I am ~p (~p), trying to join ~p~n", [MyName, self(), getName(InNetPeer)]),
             %% Grab the correct peer, split his contacts, find new neighbours
             Peer                = findCorrectPeer(InNetPeer, GUID),
             %% Add all our contacts to InNetPeer's network
@@ -243,7 +233,7 @@ handle_request(Request, Contacts, MyName, GUID, Left, Right) ->
         %% Split the contacts into two parts, one lower than own GUID and one higher
         {split_contacts, AtGUID} ->
             case AtGUID < GUID of
-                true  -> ToHigh = fun(Name, _) -> erlang:md5(Name) < GUID end;
+                true  -> ToHigh = fun(Name, _) -> erlang:md5(Name) < GUID   end;
                 false -> ToHigh = fun(Name, _) -> AtGUID < erlang:md5(Name) end
             end,
             Higher = dict:filter(ToHigh, Contacts),
@@ -266,6 +256,7 @@ handle_request(Request, Contacts, MyName, GUID, Left, Right) ->
                           Left,
                           NewPeer}
             end;
+        %% Reassigns the Left or Right neighbour
         {new_neighbour, Neighbour, Dir} ->
             case Dir of 
                 left  -> {ok,
@@ -307,24 +298,29 @@ handle_request(Request, Contacts, MyName, GUID, Left, Right) ->
              Right}
     end.
 
-%getInfo(Pid) -> 
-%    rpc(Pid, get_info).
-
 %% Test
-test() -> P1 = start("P1"),
-          add(P1, {"Donald Duck", "Duckburg", "1313-13-1313"}),
-          add(P1, {"Huey Duck", "Duckburg, at Donalds", "555-HUEY-DUCK"}),
-          P2 = start("P2"),
-          add(P2, {"Dewey Duck", "Duckburg, at Donalds", "555-DEWE-DUCK"}),
-          add(P2, {"Louie Duck", "Duckburg, at Donalds", "555-LOUI-DUCK"}),
-          join(P2, P1),
-          P3 = start("P3"),
-          add(P3, {"Scrooge McDuck", "Duckburg, at his money bin", "1"}),
-          P4 = start("P4"),
-          add(P4, {"Daisy Duck", "Unknown", "12345678"}),
-          join(P3, P4),
-          join(P4, P1),
-          lookup(P3, "Daisy Duck").
+test() -> 
+   P1 = start("P1"),
+   add(P1, {"Donald Duck", "Duckburg", "1313-13-1313"}),
+   add(P1, {"Huey Duck", "Duckburg, at Donalds", "555-HUEY-DUCK"}),
+   P2 = start("P2"),
+   add(P2, {"Dewey Duck", "Duckburg, at Donalds", "555-DEWE-DUCK"}),
+   add(P2, {"Louie Duck", "Duckburg, at Donalds", "555-LOUI-DUCK"}),
+   join(P2, P1),
+   P3 = start("P3"),
+   add(P3, {"Scrooge McDuck", "Duckburg, at his money bin", "1"}),
+   P4 = start("P4"),
+   add(P4, {"Daisy Duck", "Unknown", "12345678"}),
+   join(P3, P4),
+   join(P4, P1),
+   delete(P3, "Daisy Duck"),
+   list_all(P2).
+%% {ok,[{"Louie Duck","Duckburg, at Donalds","555-LOUI-DUCK"},
+%%      {"Donald Duck","Duckburg","1313-13-1313"},
+%%      {"Dewey Duck","Duckburg, at Donalds","555-DEWE-DUCK"},
+%%      {"Huey Duck","Duckburg, at Donalds","555-HUEY-DUCK"},
+%%      {"Scrooge McDuck","Duckburg, at his money bin","1"}]}
+
 
 jointest() -> P1 = start("P1"),
               P2 = start("P2"),
@@ -334,3 +330,4 @@ jointest() -> P1 = start("P1"),
               join(P4, P3),
               join(P3, P2),
               printChain(P4).
+%% Prints "end - P2 - P1 - P4 - P3 - end"

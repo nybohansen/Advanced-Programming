@@ -39,7 +39,7 @@ frame=single,             % [none, single, double]
 \title{Advanced Programming \\\small{Assignment 3} - \texttt{Mayo Peer-to-Peer}}
 \author{Kasper Nybo Hansen and Mads Ohm Larsen}
 
-\date{\today}
+\date{October 22, 2010}
 
 \begin{document}
 	
@@ -73,6 +73,112 @@ What happens if $P_1$ and $P_2$ makes a network together, and shares some contac
 In our implementation this results in the $P_3$/$P_4$ network all call the \texttt{join}-method on $P_1$, and are routed into the correct place.
 The contacts are also all given to $P_1$, which finds the correct peer for the contact, and gives it to that peer (Might be $P_3$ or $P_4$, but could equally likely be $P_2$).
 
+\section{Implementation} % (fold)
+\label{sec:implementation}
+To the outside world, only the following methods are exported, and the outside world is therefore only allowed to call these:
+\begin{itemize}
+	\item \texttt{start/1}
+	\item \texttt{add/2}
+	\item \texttt{list\_all/1}
+	\item \texttt{update/2}
+	\item \texttt{delete/2}
+	\item \texttt{lookup/2}
+	\item \texttt{join/2}
+	\item And two test methods
+	\begin{itemize}
+		\item \texttt{jointest/0}
+		\item \texttt{test/0}
+	\end{itemize}
+\end{itemize}
+% section implementation (end)
 
+They are pretty much selfexplanatory, but we'll discuss one of our utility methods, that all the methods concerning a specific contact uses, namely the \texttt{findCorrectPeer/2} method.
+This method takes a Pid and a GUID, and finds the correct peer for that GUID, that is, the one which has the highest GUID below this.
+This is done by checking with the neighbours, firstly if they are active (that is, that the peer we are calling is not the left or right most), secondly if we should move further left or right, or if we have got the correct peer.
+
+\begin{lstlisting}
+findCorrectPeer(InNetPeer, GUID) ->
+    case GUID < getGUID(InNetPeer) of
+        true -> LeftPeer = getNeighbour(InNetPeer, left),
+                case isActive(LeftPeer) of
+                    true  -> findCorrectPeer(LeftPeer, GUID);
+                    false -> InNetPeer
+                end;
+        false -> RightPeer = getNeighbour(InNetPeer, right),
+                 case isActive(RightPeer) of
+                     true  -> case getGUID(RightPeer) < GUID of
+                                  true  -> findCorrectPeer(RightPeer, GUID);
+                                  false -> InNetPeer
+                              end;
+                     false -> InNetPeer
+                 end
+    end.
+\end{lstlisting}
+
+This function is called prior to sending the \texttt{rpc}-call to the Pid, so we actually change the Pid, if it isn't correct.
+An example of this is the \texttt{add/2}-method.
+
+\begin{lstlisting}
+add(Pid, Contact) ->
+    {Name, _, _} = Contact,
+    Peer = findCorrectPeer(Pid, erlang:md5(Name)),
+    rpc(Peer, {add, Contact}).	
+\end{lstlisting}
+
+Our \texttt{join/2}-method also utilizes this method, to find the correct peer to join.
+The \texttt{join/2}-method also makes all the other peers in that network join the same peer in the new network.
+Doing so, we are able to join two networks together, sharing all the contacts.
+However, we are not doing any robustness check, so if the user were to make a peer join a network, that it was already part of, the system would hang.
 % section the_mayo_routing_algorithm (end)
+
+\section{Testing} % (fold)
+\label{sec:testing}
+
+The two test methods, \texttt{jointest/0} and \texttt{test/0}, we mentioned earlier, tests various parts of our implementation.
+
+\begin{lstlisting}
+jointest() -> P1 = start("P1"),
+              P2 = start("P2"),
+              P3 = start("P3"),
+              P4 = start("P4"),
+              join(P2, P1),
+              join(P4, P3),
+              join(P3, P2),
+              printChain(P4).
+%% Prints "end - P2 - P1 - P4 - P3 - end"
+
+test() -> 
+  P1 = start("P1"),
+  add(P1, {"Donald Duck", "Duckburg", "1313-13-1313"}),
+  add(P1, {"Huey Duck", "Duckburg, at Donalds", "555-HUEY-DUCK"}),
+  P2 = start("P2"),
+  add(P2, {"Dewey Duck", "Duckburg, at Donalds", "555-DEWE-DUCK"}),
+  add(P2, {"Louie Duck", "Duckburg, at Donalds", "555-LOUI-DUCK"}),
+  join(P2, P1),
+  P3 = start("P3"),
+  add(P3, {"Scrooge McDuck", "Duckburg, at his money bin", "1"}),
+  P4 = start("P4"),
+  add(P4, {"Daisy Duck", "Unknown", "12345678"}),
+  join(P3, P4),
+  join(P4, P1),
+  delete(P3, "Daisy Duck"),
+  list_all(P2).
+%% {ok,[{"Louie Duck","Duckburg, at Donalds","555-LOUI-DUCK"},
+%%      {"Donald Duck","Duckburg","1313-13-1313"},
+%%      {"Dewey Duck","Duckburg, at Donalds","555-DEWE-DUCK"},
+%%      {"Huey Duck","Duckburg, at Donalds","555-HUEY-DUCK"},
+%%      {"Scrooge McDuck","Duckburg, at his money bin","1"}]}
+\end{lstlisting}
+% section testing (end)
+
+\section{Assesment} % (fold)
+\label{sec:assesment}
+
+As mentioned earlier, our implementation do not check for robustness, that is, we trust the user to not do weird stuff, like making a peer join itself or making a peer join a network it is already part of.
+We also do not consider the case that a peer breaks down or leaves the network unexpected.
+Other than these weird cases, our implementation should be able to handle all the calls required in creating a peer-to-peer phone book.
+
+% section assesment (end)
+
+
 \end{document}
